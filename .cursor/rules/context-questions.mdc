@@ -1,0 +1,11 @@
+---
+description: Nunca assumir contexto; perguntar antes de decisões ambíguas
+alwaysApply: true
+---
+
+# Contexto e perguntas
+
+- Nunca assumir requisitos de cluster, Gateway, DNS ou custo quando estiverem ambíguos.
+- Antes de `apply`, mudança Autopilot↔Standard, exposição pública ou destroy: perguntar.
+- Preferir 1–2 perguntas críticas por vez; propor opções concretas.
+- Canon: ADRs deste repo + decisões Fase 03 (`local/FASE03-CHECKLIST.md` no workspace).
