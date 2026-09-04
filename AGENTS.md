@@ -27,7 +27,9 @@ Terraform + manifests para **GKE Autopilot**, API Gateway (se couber) e deploy d
 ## Comandos
 
 ```bash
+cd terraform
 terraform fmt -check
+terraform init -backend=false
 terraform validate
 # plan/apply/destroy e kubectl: só com confirmação humana / workflow_dispatch
 ```
