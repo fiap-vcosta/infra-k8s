@@ -11,5 +11,6 @@ alwaysApply: true
 - **`terraform apply` / destroy** e deploy de app só **manual** — merge em `main` não liga cluster.
 - Bucket de **state** remoto fora do destroy da demo.
 - Não commitar kubeconfig, chaves SA, tfvars secretos.
-- CI barato: `fmt` + `validate` (+ `plan` em PR); CD caro = `workflow_dispatch`.
+- CI barato: `fmt` + `validate` (+ `plan` em PR); CD caro = `workflow_dispatch`; root module em `terraform/`.
 - Gateway depois dos backends (auth URL + API); não inventar staging.
+- README sem referências a checklist interno (§N) nem a pastas só do workspace local.

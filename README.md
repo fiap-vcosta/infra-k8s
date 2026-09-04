@@ -4,30 +4,27 @@ Terraform + manifests para **GKE Autopilot**, entrada (API Gateway se couber) e 
 
 ## Escopo
 
-| Inclui | Não inclui |
-|--------|------------|
-| GKE Autopilot, Gateway/LB, manifests da API (§5) | Cloud SQL (repo `infra-db`) |
-| Entrada HTTP da demo | Function auth (repo `auth`); regras de domínio da oficina |
+- GKE Autopilot
+- Entrada HTTP (Gateway e/ou LB)
+- Manifests da API no cluster
+- Região `us-central1`
+- State remoto em GCS (bootstrap fora deste stack)
 
-- Região: **`us-central1`**
-- Cluster: **Autopilot** (fechado)
-- Kind / self-hosted: **não** são entrega da Fase 03 (legado na `api`)
-- State remoto GCS: bootstrap **fora** deste stack
+Root module: [`terraform/`](terraform/). Kind / self-hosted não são caminho de entrega.
 
 ## CI vs CD
 
 | Tipo | Quando | Automático? |
 |------|--------|-------------|
 | **CI** `fmt` + `validate` | PR / push | Sim ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) |
-| **`tf-apply` / `tf-destroy`** | Janela da demo | Só manual (`workflow_dispatch`) — §5 |
+| **`tf-apply` / `tf-destroy`** | Janela da demo | Só manual (`workflow_dispatch`) |
 
 Merge em `main` **nunca** liga o cluster.
 
-## Layout atual (§3)
-
-Scaffold Terraform vazio (válido para `validate`). GKE, Gateway e manifests entram na **§5**.
+## Comandos
 
 ```bash
+cd terraform
 terraform fmt -check
 terraform init -backend=false
 terraform validate
@@ -39,8 +36,6 @@ terraform validate
 2. Este repo → `tf-apply`
 3. Deploy API (e auth quando existir)
 4. Destroy inverso: este repo → `infra-db`
-
-Ver processo em `local/FASE03-PROCESSO-DEMO.md` (workspace local).
 
 ## Agentes
 
