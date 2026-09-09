@@ -65,7 +65,13 @@ jobs:
           fi
           gcloud container clusters get-credentials "$CLUSTER_NAME" \
             --region "$CLUSTER_LOCATION" --dns-endpoint
-          kubectl delete service api --namespace tech-challenge --ignore-not-found --wait
+          kubectl get services --all-namespaces \
+            -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' \
+          | while read -r namespace name; do
+              [[ -n "$name" ]] || continue
+              echo "removendo service $namespace/$name"
+              kubectl delete service "$name" --namespace "$namespace" --wait
+            done
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

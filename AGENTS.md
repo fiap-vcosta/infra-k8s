@@ -1,6 +1,6 @@
 # Tech Challenge — Guia para agentes (`infra-k8s`)
 
-Terraform + manifests para **GKE Autopilot** e deploy da API na GCP. Org [fiap-vcosta](https://github.com/fiap-vcosta). Rede e WIF em `infra-bootstrap`; banco em `infra-db`; Function em `auth`.
+Terraform do **GKE Autopilot** que hospeda a API na GCP. Org [fiap-vcosta](https://github.com/fiap-vcosta). Rede e WIF em `infra-bootstrap`; banco em `infra-db`; manifests e deploy no repo `api`; Function em `auth`.
 
 ## Antes de mudar código
 
@@ -14,17 +14,16 @@ Terraform + manifests para **GKE Autopilot** e deploy da API na GCP. Org [fiap-v
 | Peça | Papel |
 |------|--------|
 | Terraform | Cluster Autopilot, binding de Workload Identity da KSA da API |
-| Manifests | `k8s/`: namespace, KSA, ConfigMap, Deployment com sidecar do proxy, Service LoadBalancer, HPA |
 | Rede | **Consumida** do `infra-bootstrap` via `terraform_remote_state` |
 | State | Backend remoto **persistente** entre demos |
-| Fora de escopo | VPC/subnet/PSA, Cloud SQL, imagem e workflows de deploy da API, Function auth |
+| Fora de escopo | Manifests e deploy da API (repo `api`), VPC/subnet/PSA, Cloud SQL, Function auth |
 
 ## Regras canônicas (resumo)
 
-- Autopilot; apply/destroy/deploy manuais
+- Autopilot; apply/destroy manuais
+- Este repo entrega cluster e identidade, não workload: **YAML de aplicação não mora aqui**
 - Rede não se cria aqui; se falta algo na VPC, o PR é no `infra-bootstrap`
-- Namespace `tech-challenge` e KSA `api` são contrato entre `terraform/workload-identity.tf` e `k8s/serviceaccount.yaml`
-- Secret `api` não vive no Git: o deploy do repo `api` o cria a partir do Secret Manager
+- Namespace `tech-challenge` e KSA `api` são contrato com os manifests do repo `api`
 - State não morre no destroy da demo
 - Sem secrets no Git; Kind não é entrega
 
