@@ -1,47 +1,19 @@
-name: CI
+name: tf-apply
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: terraform-infra-k8s
+  cancel-in-progress: false
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  terraform:
-    name: Terraform fmt / validate
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: terraform
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.16.1"
-
-      - name: Terraform fmt
-        run: terraform fmt -check -recursive
-
-      - name: Terraform init
-        run: terraform init -backend=false -input=false
-
-      - name: Terraform validate
-        run: terraform validate
-
-  plan:
-    name: Terraform plan
-    needs: terraform
-    if: github.event_name == 'pull_request'
+  apply:
+    name: Terraform apply
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -84,5 +56,5 @@ jobs:
       - name: Terraform init
         run: terraform init -input=false
 
-      - name: Terraform plan
-        run: terraform plan -input=false -no-color
+      - name: Terraform apply
+        run: terraform apply -input=false -auto-approve

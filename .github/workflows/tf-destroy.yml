@@ -1,47 +1,19 @@
-name: CI
+name: tf-destroy
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: terraform-infra-k8s
+  cancel-in-progress: false
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  terraform:
-    name: Terraform fmt / validate
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: terraform
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.16.1"
-
-      - name: Terraform fmt
-        run: terraform fmt -check -recursive
-
-      - name: Terraform init
-        run: terraform init -backend=false -input=false
-
-      - name: Terraform validate
-        run: terraform validate
-
-  plan:
-    name: Terraform plan
-    needs: terraform
-    if: github.event_name == 'pull_request'
+  destroy:
+    name: Terraform destroy
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -59,9 +31,10 @@ jobs:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
           GCP_GKE_CLUSTER_NAME: ${{ vars.GCP_GKE_CLUSTER_NAME }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
         run: |
           missing=()
-          for name in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT_EMAIL GCP_GKE_CLUSTER_NAME; do
+          for name in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT_EMAIL GCP_GKE_CLUSTER_NAME GCP_REGION; do
             [[ -n "${!name}" ]] || missing+=("$name")
           done
           if (( ${#missing[@]} > 0 )); then
@@ -75,6 +48,25 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
 
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: gke-gcloud-auth-plugin
+
+      - name: Delete LoadBalancer services
+        working-directory: .
+        env:
+          CLUSTER_NAME: ${{ vars.GCP_GKE_CLUSTER_NAME }}
+          CLUSTER_LOCATION: ${{ vars.GCP_REGION }}
+        run: |
+          if ! gcloud container clusters describe "$CLUSTER_NAME" --region "$CLUSTER_LOCATION" >/dev/null 2>&1; then
+            echo "cluster ausente; nada a limpar"
+            exit 0
+          fi
+          gcloud container clusters get-credentials "$CLUSTER_NAME" \
+            --region "$CLUSTER_LOCATION" --dns-endpoint
+          kubectl delete service api --namespace tech-challenge --ignore-not-found --wait
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -84,5 +76,5 @@ jobs:
       - name: Terraform init
         run: terraform init -input=false
 
-      - name: Terraform plan
-        run: terraform plan -input=false -no-color
+      - name: Terraform destroy
+        run: terraform destroy -input=false -auto-approve
