@@ -29,7 +29,7 @@ O binding mora aqui, e não no `infra-bootstrap`, porque o pool `PROJECT.svc.id.
 
 ## Entrada HTTP
 
-A API é exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) declarado no repo `api`. O desenho alvo de entrada única é **API Gateway** (`/auth` + `/api`) — ver [ADR 002](docs/adrs/002-api-gateway.md). Para a API no GKE, o Gateway precisa de um backend **HTTPS com nome DNS e certificado**; sem isso o smoke (e a demo, se necessário) segue no LoadBalancer.
+A API é exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) declarado no repo `api` no 1º smoke. O desenho oficial de entrada é **API Gateway** (`/auth` + `/api`) com backend da API em **HTTPS + domínio + certificado gerenciado** — ver [ADR 002](docs/adrs/002-api-gateway.md).
 
 ## Acesso ao cluster
 
