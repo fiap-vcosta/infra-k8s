@@ -29,7 +29,7 @@ O binding mora aqui, e não no `infra-bootstrap`, porque o pool `PROJECT.svc.id.
 
 ## Entrada HTTP
 
-A API é exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) declarado no repo `api`. API Gateway continua no radar: com backend no GKE ele exige URL pública HTTPS com certificado válido, ou seja, domínio — decisão que fica para a ADR de entrada junto com as rotas da Function `auth`.
+A API é exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) declarado no repo `api`. O desenho alvo de entrada única é **API Gateway** (`/auth` + `/api`) — ver [ADR 002](docs/adrs/002-api-gateway.md). Restrição: backend GKE no Gateway exige **URL pública HTTPS com certificado válido (domínio)**; sem isso o smoke segue no LoadBalancer.
 
 ## Acesso ao cluster
 
@@ -71,6 +71,10 @@ terraform validate
 4. Destroy inverso: este repo → `infra-db`
 
 O `infra-bootstrap` é pré-requisito aplicado uma vez e não entra nesse ciclo.
+
+## Decisões (ADRs)
+
+Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy` e API Gateway.
 
 ## Agentes
 
