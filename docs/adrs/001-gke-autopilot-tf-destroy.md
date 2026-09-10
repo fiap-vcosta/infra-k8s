@@ -6,7 +6,7 @@
 
 ## 1. Contexto e Problema
 
-A API precisa rodar na GCP com escala horizontal demonstrável (HPA), na mesma VPC do Cloud SQL, com identidade para o Auth Proxy. Kind / self-hosted saíram do caminho de entrega. O cluster é o maior custo da demo: deve ligar só na janela e sumir no destroy.
+A API precisa rodar na GCP com escala horizontal demonstrável (HPA), na mesma VPC do Cloud SQL, com identidade para o Auth Proxy. O cluster é o maior custo da demo: deve ligar só na janela e sumir no destroy.
 
 O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garante que nada caro (nem órfão de cobrança) sobreviva à demo?**
 
@@ -16,7 +16,6 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 - **Control plane:** **DNS-only** (acesso por DNS + IAM; sem endpoint IP nem lista de IPs autorizados).
 - **Escopo deste repo:** cluster + binding de Workload Identity da KSA da API. **Manifests da aplicação ficam no repo `api`.**
 - **Ciclo de vida:** `tf-apply` / `tf-destroy` **manuais** (`workflow_dispatch`). `tf-destroy` apaga o state inteiro deste stack (sem carve-outs) e, **antes** do destroy, remove Services `LoadBalancer` do cluster para não deixar forwarding rule órfã cobrada.
-- **Plano B:** GKE Standard só se Autopilot falhar por quota na hora do apply.
 
 ## 3. Justificativa
 
@@ -27,9 +26,9 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 
 ## 4. Alternativas Consideradas
 
-* **GKE Standard:** controle fino de nós; paga VMs o tempo todo o cluster existir — pior para demo curta. Só plano B de quota.
+* **GKE Standard:** controle fino de nós; paga VMs o tempo todo o cluster existir — pior para demo curta.
 * **Cloud Run para a API:** escala a zero; foge do requisito de HPA/Kubernetes do enunciado.
-* **Manter Kind / self-hosted na entrega:** rejeitado; ficam só como referência histórica.
+* **Kind / self-hosted:** rejeitados como caminho de entrega na nuvem.
 * **Carve-outs no destroy** (proteger resources com `prevent_destroy`): rejeitado — state mentiria e órfãos acumulariam.
 * **Control plane com IP público + authorized networks:** mais familiar; exige manter allowlist e complica CI.
 
@@ -41,9 +40,7 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 * Demo-down previsível: destroy k8s → destroy db.
 
 ### Negativas / Riscos (Mitigações)
-* **Autopilot pode negar quota** na região.
-  * *Mitigação:* tentar Standard ou `us-east1` (alinhar com ADR de região no bootstrap).
 * **Esquecer o destroy** deixa Autopilot sangrando.
-  * *Mitigação:* Budget + checklist de down; destroy manual obrigatório.
+  * *Mitigação:* processo demo-down obrigatório; destroy manual ao fim da janela.
 * **Contrato namespace/`ServiceAccount` com a `api`:** mismatch só aparece em runtime.
   * *Mitigação:* valores documentados no README; binding e manifests devem usar os mesmos nomes.
