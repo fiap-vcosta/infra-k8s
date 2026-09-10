@@ -13,22 +13,22 @@ O problema a ser resolvido é: **Usamos GCP API Gateway na frente de `/auth` e `
 ## 2. Decisão
 
 - **Produto:** **GCP API Gateway**, Terraform neste repo, preferência por gateway único com rotas `/auth` e `/api`.
-- **Validação de custo na execução:** se o preço na janela de demo não couber, manter LB (ou outro front barato) e documentar o desvio.
+- **Validação de custo na execução:** se o preço na janela de demo não couber, manter o LoadBalancer (ou outro front barato) e documentar o desvio.
 - **Ordem:** 1º smoke pode ser só API/health via LoadBalancer; rotas `/auth` entram quando a Function existir.
-- **Restrição explícita (backend GKE):** API Gateway na frente de um backend no GKE exige **URL pública HTTPS com certificado válido** — ou seja, **domínio** (e certificado gerenciado/adequado). IP HTTP nu de um `LoadBalancer` **não** satisfaz esse requisito tipicamente. Sem domínio/cert, o gateway completo fica bloqueado; o LB da API continua como entrada temporária/aceitável para smoke.
+- **Restrição (API no GKE atrás do Gateway):** o API Gateway não fala com o pod diretamente — ele chama uma **URL de backend**. Para a API no GKE, essa URL precisa ser **HTTPS público com certificado válido em um nome DNS** (ex.: `https://api.exemplo.com`). Um LoadBalancer que só expõe `http://IP` **não serve** como backend tipicamente. Enquanto não houver domínio + certificado na frente da API, o Gateway completo (`/api`) fica pendente; o LoadBalancer HTTP continua válido para smoke e para a demo se o Gateway não couber.
 
 ## 3. Justificativa
 
 * Casa com o desenho de entrada única do enunciado e separa auth cliente (Function) da API.
 * Terraform no `infra-k8s` mantém a borda HTTP perto do cluster (mesmo ciclo de demo).
-* Registrar a restrição de HTTPS+domínio evita surpresa na implementação e explica por que o 1º smoke usou LB.
+* Deixar a restrição explícita evita surpresa na implementação e explica o smoke com LoadBalancer.
 
 ## 4. Alternativas Consideradas
 
 * **Só LoadBalancer / Ingress sem API Gateway:** mais simples e barato; atende smoke; perde o “gateway único” acadêmico se for a entrega final.
-* **Cloud Load Balancing + URL map manual:** flexível; mais peças e custo operacional que API Gateway para o escopo da demo.
-* **Expor Function e API em URLs separadas sem front comum:** funciona; pior narrativa de arquitetura e de vídeo.
-* **Gateway sem domínio (só IP HTTP):** incompatível com o requisito usual de backend HTTPS do API Gateway → GKE.
+* **Cloud Load Balancing + URL map** (rotear `/auth` e `/api` sem API Gateway): resolve entrada única com TLS no próprio LB, se houver domínio; mais peças que o API Gateway para o escopo da demo.
+* **URLs separadas** (Function HTTPS nativa + API no LB): funciona; pior narrativa de arquitetura e de vídeo.
+* **Apontar o Gateway para `http://IP` da API:** rejeitado — não atende o requisito usual de backend HTTPS do produto.
 
 ## 5. Consequências
 
@@ -38,9 +38,9 @@ O problema a ser resolvido é: **Usamos GCP API Gateway na frente de `/auth` e `
 * Custo do gateway permanece sob avaliação consciente.
 
 ### Negativas / Riscos (Mitigações)
-* **Dependência de domínio + certificado** para fechar `/api` via Gateway.
-  * *Mitigação:* obter domínio (ou desistir do Gateway na entrega e declarar LB no README/vídeo); não inventar HTTP-only atrás do Gateway.
+* **Sem domínio/cert, `/api` no Gateway não fecha.**
+  * *Mitigação (caminhos válidos):* (1) domínio barato + DNS apontando para a API + certificado gerenciado (Ingress/Gateway HTTPS ou LB HTTPS) e aí cadastrar `https://…` como backend do API Gateway; (2) desistir do Gateway na entrega e documentar LB + URL da Function; (3) Gateway só em `/auth` (Function já nasce HTTPS) e API continua no LB — entrada não fica 100% única.
 * **Custo extra** na janela.
-  * *Mitigação:* validar na execução; Budget R$ 50; destroy remove o que este state criar.
+  * *Mitigação:* validar na execução; maximizar free tier; `tf-destroy` remove o que este state criar.
 * **OpenAPI / config do Gateway** a definir na implementação (paths exatos).
   * *Mitigação:* alinhar com Swagger/Requestly da `api` e contrato do repo `auth`.
