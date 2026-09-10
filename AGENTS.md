@@ -4,7 +4,7 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP. Org [fiap-vcosta](https
 
 ## Antes de mudar código
 
-1. Ler ADRs deste repo (quando existirem) e decisões Autopilot/Gateway/custo da Fase 03
+1. Ler ADRs em [`docs/adrs/`](docs/adrs/) e decisões Autopilot/Gateway/custo já tomadas
 2. Espelhar módulos/manifests vizinhos; não inventar layout paralelo
 3. Não rodar `apply`/`destroy`/deploy sem confirmação explícita do usuário
 4. **Git:** nunca commit/push direto em `main` — branch → PR → merge (ver [`.cursor/rules/git-workflow.mdc`](.cursor/rules/git-workflow.mdc))
