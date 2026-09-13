@@ -76,8 +76,8 @@ variable "auth_service_auth_key" {
 
 variable "auth_memory" {
   type        = string
-  description = "Limite de memória do container auth."
-  default     = "256Mi"
+  description = "Limite de memória do container auth (GEN1; mínimo 128Mi)."
+  default     = "128Mi"
 }
 
 variable "auth_cpu" {
