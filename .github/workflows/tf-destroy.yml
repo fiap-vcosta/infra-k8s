@@ -77,7 +77,7 @@ jobs:
         with:
           install_components: gke-gcloud-auth-plugin
 
-      - name: Delete LoadBalancer services
+      - name: Delete LoadBalancer services and Ingresses
         working-directory: .
         env:
           CLUSTER_NAME: ${{ vars.GCP_GKE_CLUSTER_NAME }}
@@ -95,6 +95,13 @@ jobs:
               [[ -n "$name" ]] || continue
               echo "removendo service $namespace/$name"
               kubectl delete service "$name" --namespace "$namespace" --wait
+            done
+          kubectl get ingress --all-namespaces \
+            -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' \
+          | while read -r namespace name; do
+              [[ -n "$name" ]] || continue
+              echo "removendo ingress $namespace/$name"
+              kubectl delete ingress "$name" --namespace "$namespace" --wait
             done
 
       - name: Setup Terraform

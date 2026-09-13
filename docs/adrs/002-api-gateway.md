@@ -13,7 +13,7 @@ O problema a ser resolvido é: **Usamos GCP API Gateway na frente de `/auth` e `
 ## 2. Decisão
 
 - **Produto:** **GCP API Gateway**, Terraform neste repo, gateway único com rotas `/auth` e `/api`.
-- **Caminho oficial (HTTPS nomeado):** domínio barato + DNS apontando para a API + **certificado gerenciado** (Ingress/Gateway HTTPS ou LB HTTPS no GKE) → backend do API Gateway em `https://…` para a API; Function (já HTTPS) como backend de `/auth`.
+- **Caminho oficial (HTTPS nomeado):** domínio barato + Cloud DNS (zona no `infra-bootstrap`; records `api`/`auth` neste repo) + **certificado gerenciado** (Ingress no repo `api`) → backend do API Gateway em `https://…` para a API; Cloud Run auth (já HTTPS, com hostname custom) como backend de `/auth`.
 - **Ordem:** 1º smoke e desenvolvimento cedo usam LoadBalancer HTTP; domínio/cert + Gateway completo entram na janela da Function (`auth`), antes da demo gravável.
 - **Restrição:** o API Gateway chama uma **URL de backend**. Para a API no GKE essa URL precisa ser **HTTPS público com certificado válido em um nome DNS**. Um LoadBalancer que só expõe `http://IP` **não serve** como backend tipicamente.
 

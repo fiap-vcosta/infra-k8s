@@ -97,3 +97,9 @@ variable "auth_max_instance_count" {
   description = "Máximo de instâncias do auth."
   default     = 2
 }
+
+variable "api_static_ip_name" {
+  type        = string
+  description = "Nome do IP global reservado para o Ingress HTTPS da API."
+  default     = "tech-challenge-api"
+}
