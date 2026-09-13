@@ -23,6 +23,7 @@ resource "google_cloud_run_v2_service" "auth" {
       }
 
       resources {
+        cpu_idle = true
         limits = {
           cpu    = var.auth_cpu
           memory = var.auth_memory
