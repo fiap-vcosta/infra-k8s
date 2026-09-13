@@ -1,5 +1,5 @@
 locals {
-  auth_image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/auth:${var.auth_image_tag}"
+  auth_image = "${var.region}-docker.pkg.dev/${var.project_id}/${var.artifact_registry_repository}/auth:latest"
 }
 
 resource "google_cloud_run_v2_service" "auth" {

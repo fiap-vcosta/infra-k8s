@@ -45,12 +45,6 @@ variable "auth_service_name" {
   default     = "auth"
 }
 
-variable "auth_image_tag" {
-  type        = string
-  description = "Tag da imagem auth no Artifact Registry."
-  default     = "latest"
-}
-
 variable "auth_api_base_url" {
   type        = string
   description = "URL pública da API consultada pelo auth (var/input API_BASE_URL)."

@@ -59,7 +59,7 @@ Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_W
 
 Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:latest` no Artifact Registry).
 
-No `tf-apply`, inputs opcionais `api_base_url` e `auth_image_tag`. Outputs: `auth_service_uri`, `auth_image`.
+No `tf-apply`, input opcional `api_base_url`. A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`.
 
 O `tf-destroy` deste repo remove o Cloud Run auth **junto** com o cluster.
 
