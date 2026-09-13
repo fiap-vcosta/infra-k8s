@@ -13,7 +13,8 @@ resource "google_cloud_run_v2_service" "auth" {
       max_instance_count = var.auth_max_instance_count
     }
 
-    timeout = var.auth_timeout
+    timeout               = var.auth_timeout
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN1"
 
     containers {
       image = local.auth_image
