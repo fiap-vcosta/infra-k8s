@@ -47,7 +47,7 @@ variable "auth_service_name" {
 
 variable "auth_api_base_url" {
   type        = string
-  description = "URL pública da API consultada pelo auth (var/input API_BASE_URL)."
+  description = "URL pública da API consultada pelo auth (workflows: https://api.<DOMAIN>)."
 }
 
 variable "auth_jwt_cliente_key" {

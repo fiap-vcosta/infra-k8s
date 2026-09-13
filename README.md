@@ -66,13 +66,13 @@ Merge em `main` **nunca** liga o cluster.
 
 O `tf-destroy` apaga todo `Service type: LoadBalancer` e todo `Ingress` do cluster antes do `terraform destroy`: destruir o cluster com um deles de pé pode deixar forwarding rule / IP global órfão, cobrado por hora mesmo sem tráfego. A varredura é por tipo, não por nome, justamente porque os manifests não são deste repo.
 
-Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`. Para o auth: var `API_BASE_URL` (ou input no `tf-apply`) e secrets `JWT_CLIENTE_KEY` / `SERVICE_AUTH_KEY` (iguais aos da `api` / org). Os workflows falham cedo se o obrigatório vier vazio.
+Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`, `DOMAIN` (ex. `vcosta-fiap.online`). O Cloud Run auth recebe `API_BASE_URL=https://api.<DOMAIN>`. Secrets `JWT_CLIENTE_KEY` / `SERVICE_AUTH_KEY` (iguais aos da `api` / org). Os workflows falham cedo se o obrigatório vier vazio.
 
 ## Auth (Cloud Run)
 
 Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:latest` no Artifact Registry).
 
-No `tf-apply`, input opcional `api_base_url`. A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`.
+No `tf-apply`, `API_BASE_URL` do auth sai de `DOMAIN` (`https://api.<DOMAIN>`). A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`.
 
 O `tf-destroy` deste repo remove o Cloud Run auth, domain mapping, records DNS e o IP global **junto** com o cluster.
 
