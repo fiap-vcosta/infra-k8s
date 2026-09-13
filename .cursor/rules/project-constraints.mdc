@@ -5,8 +5,8 @@ alwaysApply: true
 
 # Restrições do projeto (`infra-k8s`)
 
-- Escopo: **Terraform** do cluster **GKE Autopilot** e da identidade que a app assume — **não** Cloud SQL (repo `infra-db`), **não** rede/WIF (repo `infra-bootstrap`).
-- **YAML de aplicação não mora aqui:** manifests e workflow de deploy vivem no repo da app (`api`), junto do código. Este repo entrega cluster e identidade.
+- Escopo: **Terraform** do cluster **GKE Autopilot**, identidade da API e **Cloud Run `auth`** — **não** Cloud SQL (repo `infra-db`), **não** rede/WIF (repo `infra-bootstrap`).
+- **YAML de aplicação da API não mora aqui:** manifests e workflow de deploy vivem no repo `api`. Imagem do auth é buildada no repo `auth`; o serviço Cloud Run é deste stack.
 - GKE = **Autopilot** (fechado); Standard só plano B se quota Autopilot falhar.
 - Kind / self-hosted aposentados na entrega; não ressuscitar como caminho oficial.
 - **`terraform apply` / destroy** e deploy de app só **manual** — merge em `main` não liga cluster.
