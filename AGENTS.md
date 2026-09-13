@@ -13,15 +13,15 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP. Org [fiap-vcosta](https
 
 | Peça | Papel |
 |------|--------|
-| Terraform | Cluster Autopilot, binding de Workload Identity da KSA da API |
+| Terraform | Cluster Autopilot, binding WI da KSA da API, Cloud Run `auth` |
 | Rede | **Consumida** do `infra-bootstrap` via `terraform_remote_state` |
 | State | Backend remoto **persistente** entre demos |
-| Fora de escopo | Manifests e deploy da API (repo `api`), VPC/subnet/PSA, Cloud SQL, Function auth |
+| Fora de escopo | Manifests/deploy da API (repo `api`), código/imagem do auth (repo `auth` só `build-push`), VPC/subnet/PSA, Cloud SQL |
 
 ## Regras canônicas (resumo)
 
 - Autopilot; apply/destroy manuais
-- Este repo entrega cluster e identidade, não workload: **YAML de aplicação não mora aqui**
+- **YAML de aplicação da API não mora aqui**; o serviço Cloud Run do auth sim (mesmo ciclo da demo)
 - Rede não se cria aqui; se falta algo na VPC, o PR é no `infra-bootstrap`
 - Namespace `tech-challenge` e KSA `api` são contrato com os manifests do repo `api`
 - State não morre no destroy da demo

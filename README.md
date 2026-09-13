@@ -7,9 +7,10 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP — Tech Challenge FIAP 
 - Cluster GKE Autopilot regional `tech-challenge-gke` em `us-central1`, VPC-native na rede do `infra-bootstrap`
 - Control plane só por **DNS endpoint** (autenticação IAM), sem endpoint IP
 - Binding de Workload Identity da service account Kubernetes da API sobre a service account de runtime
+- Cloud Run **`auth`** (imagem do repo [`auth`](https://github.com/fiap-vcosta/auth)) — sobe e desce com este stack
 - State remoto em GCS (o bucket é do `infra-bootstrap` e não morre no destroy)
 
-Este stack entrega **cluster e identidade**, não workload: os manifests da API (Deployment, Service, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api), ao lado do código e do workflow que os aplica. A rede vem do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
+Este stack entrega **cluster, identidade e o serviço auth**. Os manifests da API (Deployment, Service, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api). A rede vem do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
 
 Root module: [`terraform/`](terraform/).
 
@@ -52,7 +53,15 @@ Merge em `main` **nunca** liga o cluster.
 
 O `tf-destroy` apaga todo `Service type: LoadBalancer` do cluster antes do `terraform destroy`: destruir o cluster com um deles de pé pode deixar forwarding rule órfão, que é cobrado por hora mesmo sem tráfego. A varredura é por tipo, não por nome, justamente porque os manifests não são deste repo.
 
-Org vars consumidas: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME` e `GCP_REGION`. Os workflows falham cedo se alguma vier vazia, em vez de aplicar silenciosamente o default do código.
+Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`. Para o auth: var `API_BASE_URL` (ou input no `tf-apply`) e secrets `JWT_CLIENTE_KEY` / `SERVICE_AUTH_KEY` (iguais aos da `api` / org). Os workflows falham cedo se o obrigatório vier vazio.
+
+## Auth (Cloud Run)
+
+Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:latest` no Artifact Registry).
+
+No `tf-apply`, inputs opcionais `api_base_url` e `auth_image_tag`. Outputs: `auth_service_uri`, `auth_image`.
+
+O `tf-destroy` deste repo remove o Cloud Run auth **junto** com o cluster.
 
 ## Comandos
 
@@ -65,10 +74,11 @@ terraform validate
 
 ## Ordem na demo
 
-1. `infra-db` → `tf-apply`
-2. Este repo → `tf-apply` (Autopilot leva ~5–10 min)
-3. `api` → `deploy`
-4. Destroy inverso: este repo → `infra-db`
+1. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
+2. `infra-db` → `tf-apply`
+3. Este repo → `tf-apply` (Autopilot + Cloud Run auth; ~5–10 min o cluster)
+4. `api` → `deploy`
+5. Destroy inverso: este repo → `infra-db`
 
 O `infra-bootstrap` é pré-requisito aplicado uma vez e não entra nesse ciclo.
 
