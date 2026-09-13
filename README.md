@@ -8,9 +8,10 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP — Tech Challenge FIAP 
 - Control plane só por **DNS endpoint** (autenticação IAM), sem endpoint IP
 - Binding de Workload Identity da service account Kubernetes da API sobre a service account de runtime
 - Cloud Run **`auth`** (imagem do repo [`auth`](https://github.com/fiap-vcosta/auth)) — sobe e desce com este stack
+- IP global + records Cloud DNS `api.<domínio>` (A) e `auth.<domínio>` (CNAME) + domain mapping do Cloud Run auth
 - State remoto em GCS (o bucket é do `infra-bootstrap` e não morre no destroy)
 
-Este stack entrega **cluster, identidade e o serviço auth**. Os manifests da API (Deployment, Service, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api). A rede vem do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
+Este stack entrega **cluster, identidade, auth e DNS da janela**. Os manifests da API (Deployment, Service, Ingress, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api). A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
 
 Root module: [`terraform/`](terraform/).
 
@@ -30,7 +31,19 @@ O binding mora aqui, e não no `infra-bootstrap`, porque o pool `PROJECT.svc.id.
 
 ## Entrada HTTP
 
-A API é exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) declarado no repo `api` no 1º smoke. O desenho oficial de entrada é **API Gateway** (`/auth` + `/api`) com backend da API em **HTTPS + domínio + certificado gerenciado** — ver [ADR 002](docs/adrs/002-api-gateway.md).
+A API ainda pode ser exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) no repo `api` no 1º smoke. O desenho oficial é **HTTPS nomeado** + **API Gateway** (`/auth` + `/api`) — ver [ADR 002](docs/adrs/002-api-gateway.md).
+
+Neste stack, a cada `tf-apply`:
+
+| Peça | Valor típico |
+|------|----------------|
+| IP global | recurso `tech-challenge-api` (output `api_static_ip` / `api_static_ip_name`) |
+| `api.vcosta-fiap.online` | A → esse IP |
+| `auth.vcosta-fiap.online` | CNAME → `ghs.googlehosted.com` + domain mapping no Cloud Run |
+
+O Ingress + ManagedCertificate da API (annotation `kubernetes.io/ingress.global-static-ip-name: tech-challenge-api`) ficam no repo `api`. A managed zone e os nameservers no registrador ficam no `infra-bootstrap`.
+
+O IP global **cobra parado**: o `tf-destroy` o remove junto com records e domain mapping.
 
 ## Acesso ao cluster
 
@@ -51,7 +64,7 @@ gcloud container clusters get-credentials tech-challenge-gke \
 
 Merge em `main` **nunca** liga o cluster.
 
-O `tf-destroy` apaga todo `Service type: LoadBalancer` do cluster antes do `terraform destroy`: destruir o cluster com um deles de pé pode deixar forwarding rule órfão, que é cobrado por hora mesmo sem tráfego. A varredura é por tipo, não por nome, justamente porque os manifests não são deste repo.
+O `tf-destroy` apaga todo `Service type: LoadBalancer` e todo `Ingress` do cluster antes do `terraform destroy`: destruir o cluster com um deles de pé pode deixar forwarding rule / IP global órfão, cobrado por hora mesmo sem tráfego. A varredura é por tipo, não por nome, justamente porque os manifests não são deste repo.
 
 Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`. Para o auth: var `API_BASE_URL` (ou input no `tf-apply`) e secrets `JWT_CLIENTE_KEY` / `SERVICE_AUTH_KEY` (iguais aos da `api` / org). Os workflows falham cedo se o obrigatório vier vazio.
 
@@ -59,9 +72,9 @@ Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_W
 
 Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:latest` no Artifact Registry).
 
-No `tf-apply`, input opcional `api_base_url`. A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`.
+No `tf-apply`, input opcional `api_base_url`. A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`.
 
-O `tf-destroy` deste repo remove o Cloud Run auth **junto** com o cluster.
+O `tf-destroy` deste repo remove o Cloud Run auth, domain mapping, records DNS e o IP global **junto** com o cluster.
 
 ## Comandos
 
@@ -74,13 +87,14 @@ terraform validate
 
 ## Ordem na demo
 
-1. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
-2. `infra-db` → `tf-apply`
-3. Este repo → `tf-apply` (Autopilot + Cloud Run auth; ~5–10 min o cluster)
-4. `api` → `deploy`
-5. Destroy inverso: este repo → `infra-db`
+1. `infra-bootstrap` aplicado (zona Cloud DNS + NS no registrador, uma vez)
+2. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
+3. `infra-db` → `tf-apply`
+4. Este repo → `tf-apply` (Autopilot + Cloud Run auth + DNS/IP; ~5–10 min o cluster)
+5. `api` → Ingress/cert + `deploy`
+6. Destroy inverso: este repo → `infra-db`
 
-O `infra-bootstrap` é pré-requisito aplicado uma vez e não entra nesse ciclo.
+O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e não entra nesse ciclo.
 
 ## Decisões (ADRs)
 
