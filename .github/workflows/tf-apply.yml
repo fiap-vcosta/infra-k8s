@@ -96,4 +96,7 @@ jobs:
             echo "- API static IP: \`$(terraform output -raw api_static_ip)\` (\`$(terraform output -raw api_static_ip_name)\`)"
             echo "- Auth image: \`$(terraform output -raw auth_image)\`"
             echo "- Auth API_BASE_URL: \`https://api.${{ vars.DOMAIN }}\`"
+            echo "- Gateway: \`https://$(terraform output -raw gateway_default_hostname)\`"
+            echo "- Gateway /auth → \`$(terraform output -raw gateway_auth_backend_url)\`"
+            echo "- Gateway /api → \`$(terraform output -raw gateway_api_backend_url)\`"
           } >> "$GITHUB_STEP_SUMMARY"

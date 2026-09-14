@@ -9,9 +9,10 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP — Tech Challenge FIAP 
 - Binding de Workload Identity da service account Kubernetes da API sobre a service account de runtime
 - Cloud Run **`auth`** (imagem do repo [`auth`](https://github.com/fiap-vcosta/auth)) — sobe e desce com este stack
 - IP global + records Cloud DNS `api.<domínio>` (A) e `auth.<domínio>` (CNAME) + domain mapping do Cloud Run auth
+- **API Gateway** (`/auth` + `/api`) com backends HTTPS nomeados
 - State remoto em GCS (o bucket é do `infra-bootstrap` e não morre no destroy)
 
-Este stack entrega **cluster, identidade, auth e DNS da janela**. Os manifests da API (Deployment, Service, Ingress, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api). A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
+Este stack entrega **cluster, identidade, auth, DNS da janela e API Gateway**. Os manifests da API (Deployment, Service, Ingress, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api). A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
 
 Root module: [`terraform/`](terraform/).
 
@@ -31,7 +32,7 @@ O binding mora aqui, e não no `infra-bootstrap`, porque o pool `PROJECT.svc.id.
 
 ## Entrada HTTP
 
-A API ainda pode ser exposta por um `Service type: LoadBalancer` (L4 externo, HTTP) no repo `api` no 1º smoke. O desenho oficial é **HTTPS nomeado** + **API Gateway** (`/auth` + `/api`) — ver [ADR 002](docs/adrs/002-api-gateway.md).
+O desenho oficial é **HTTPS nomeado** + **API Gateway** (`/auth` + `/api`) — ver [ADR 002](docs/adrs/002-api-gateway.md).
 
 Neste stack, a cada `tf-apply`:
 
@@ -40,10 +41,15 @@ Neste stack, a cada `tf-apply`:
 | IP global | recurso `tech-challenge-api` (output `api_static_ip` / `api_static_ip_name`) |
 | `api.vcosta-fiap.online` | A → esse IP |
 | `auth.vcosta-fiap.online` | CNAME → `ghs.googlehosted.com` + domain mapping no Cloud Run |
+| API Gateway | output `gateway_default_hostname` — `https://<hostname>/auth` e `https://<hostname>/api/...` |
+
+Backends do Gateway (defaults): `https://auth.<domínio>` e `https://api.<domínio>` (`gateway_auth_backend_url` / `gateway_api_backend_url` sobrescrevem se preciso, ex. `*.run.app`).
 
 O Ingress + ManagedCertificate da API (annotation `kubernetes.io/ingress.global-static-ip-name: tech-challenge-api`) ficam no repo `api`. A managed zone e os nameservers no registrador ficam no `infra-bootstrap`.
 
-O IP global **cobra parado**: o `tf-destroy` o remove junto com records e domain mapping.
+Pré-requisito do Gateway: `https://api.…` com cert Active e auth HTTPS (hostname ou `*.run.app`). Na primeira janela: `tf-apply` (cluster + auth + DNS) → DNS Hostinger → `deploy` da API → cert Active → **`tf-apply` de novo** (cria/atualiza o Gateway).
+
+O IP global **cobra parado**: o `tf-destroy` o remove junto com records, domain mapping e o Gateway.
 
 ## Acesso ao cluster
 
@@ -74,7 +80,7 @@ Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:
 
 No `tf-apply`, `API_BASE_URL` do auth sai de `DOMAIN` (`https://api.<DOMAIN>`). A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`.
 
-O `tf-destroy` deste repo remove o Cloud Run auth, domain mapping, records DNS e o IP global **junto** com o cluster.
+O `tf-destroy` deste repo remove o Cloud Run auth, domain mapping, records DNS, o IP global e o **API Gateway** **junto** com o cluster.
 
 ## Comandos
 
@@ -91,8 +97,11 @@ terraform validate
 2. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
 3. `infra-db` → `tf-apply`
 4. Este repo → `tf-apply` (Autopilot + Cloud Run auth + DNS/IP; ~5–10 min o cluster)
-5. `api` → Ingress/cert + `deploy`
-6. Destroy inverso: este repo → `infra-db`
+5. DNS Hostinger (A `api` / CNAME `auth`) enquanto NS não forem Google
+6. `api` → Ingress/cert + `deploy`; esperar ManagedCertificate **Active**
+7. Este repo → **`tf-apply` de novo** (API Gateway com backends HTTPS)
+8. Smoke: Gateway `/auth` → JWT → Gateway `/api/.../aprovar`
+9. Destroy inverso: este repo → `infra-db`
 
 O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e não entra nesse ciclo.
 

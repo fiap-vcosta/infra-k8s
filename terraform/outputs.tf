@@ -37,3 +37,23 @@ output "auth_hostname" {
   description = "Hostname DNS do auth (CNAME → ghs.googlehosted.com)."
   value       = local.auth_hostname
 }
+
+output "gateway_default_hostname" {
+  description = "Hostname do API Gateway (https://<hostname>/auth e /api/...)."
+  value       = google_api_gateway_gateway.main.default_hostname
+}
+
+output "gateway_id" {
+  description = "ID do gateway."
+  value       = google_api_gateway_gateway.main.gateway_id
+}
+
+output "gateway_auth_backend_url" {
+  description = "Backend HTTPS usado em /auth."
+  value       = local.gateway_auth_backend_url
+}
+
+output "gateway_api_backend_url" {
+  description = "Backend HTTPS usado em /api."
+  value       = local.gateway_api_backend_url
+}

@@ -13,7 +13,7 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP. Org [fiap-vcosta](https
 
 | Peça | Papel |
 |------|--------|
-| Terraform | Cluster Autopilot, binding WI da KSA da API, Cloud Run `auth`, IP/DNS da janela |
+| Terraform | Cluster Autopilot, binding WI da KSA da API, Cloud Run `auth`, IP/DNS da janela, API Gateway |
 | Rede / zona DNS | **Consumidas** do `infra-bootstrap` via `terraform_remote_state` |
 | State | Backend remoto **persistente** entre demos |
 | Fora de escopo | Manifests/deploy da API (repo `api`), código/imagem do auth (repo `auth` só `build-push`), VPC/subnet/PSA, zona Cloud DNS, Cloud SQL |

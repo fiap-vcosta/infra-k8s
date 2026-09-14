@@ -103,3 +103,29 @@ variable "api_static_ip_name" {
   description = "Nome do IP global reservado para o Ingress HTTPS da API."
   default     = "tech-challenge-api"
 }
+
+variable "gateway_api_id" {
+  type        = string
+  description = "ID do API Gateway API (recurso google_api_gateway_api)."
+  default     = "tech-challenge"
+}
+
+variable "gateway_id" {
+  type        = string
+  description = "ID do gateway HTTP (hostname *.gateway.dev)."
+  default     = "tech-challenge"
+}
+
+variable "gateway_auth_backend_url" {
+  type        = string
+  nullable    = true
+  default     = null
+  description = "Backend HTTPS de /auth. Null = https://<auth_hostname>."
+}
+
+variable "gateway_api_backend_url" {
+  type        = string
+  nullable    = true
+  default     = null
+  description = "Backend HTTPS de /api. Null = https://<api_hostname>."
+}
