@@ -38,11 +38,6 @@ output "auth_hostname" {
   value       = local.auth_hostname
 }
 
-output "gateway_default_hostname" {
-  description = "Hostname nativo *.gateway.dev (debug; entrada oficial e o apex)."
-  value       = google_api_gateway_gateway.main.default_hostname
-}
-
 output "gateway_entry_ip" {
   description = "IP global do HTTPS LB da entrada (A do apex na Hostinger)."
   value       = google_compute_global_address.gateway_entry.address

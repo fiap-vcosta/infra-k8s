@@ -98,7 +98,6 @@ jobs:
             echo "- Auth API_BASE_URL: \`https://api.${{ vars.DOMAIN }}\`"
             echo "- Entrada (apex): \`https://$(terraform output -raw gateway_entry_hostname)\`"
             echo "- Entrada IP (A @ na Hostinger): \`$(terraform output -raw gateway_entry_ip)\` (\`$(terraform output -raw gateway_entry_ip_name)\`)"
-            echo "- Gateway nativo (debug): \`https://$(terraform output -raw gateway_default_hostname)\`"
             echo "- Gateway /auth → \`$(terraform output -raw gateway_auth_backend_url)\`"
             echo "- Gateway /api → \`$(terraform output -raw gateway_api_backend_url)\`"
           } >> "$GITHUB_STEP_SUMMARY"
