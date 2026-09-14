@@ -3,9 +3,10 @@ locals {
 }
 
 resource "google_cloud_run_v2_service" "auth" {
-  name     = var.auth_service_name
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  name                = var.auth_service_name
+  location            = var.region
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
 
   template {
     scaling {
