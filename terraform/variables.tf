@@ -129,3 +129,9 @@ variable "gateway_api_backend_url" {
   default     = null
   description = "Backend HTTPS de /api. Null = https://<api_hostname>."
 }
+
+variable "gateway_entry_ip_name" {
+  type        = string
+  description = "Nome do IP global da entrada publica (apex → API Gateway via HTTPS LB)."
+  default     = "tech-challenge-entry"
+}

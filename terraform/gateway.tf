@@ -4,6 +4,7 @@ locals {
   gateway_openapi = templatefile("${path.module}/openapi/gateway.yaml.tftpl", {
     auth_backend_url = local.gateway_auth_backend_url
     api_backend_url  = local.gateway_api_backend_url
+    entry_hostname   = local.dns_name
   })
   gateway_openapi_hash = substr(sha256(local.gateway_openapi), 0, 8)
 }
