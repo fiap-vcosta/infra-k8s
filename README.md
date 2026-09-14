@@ -47,7 +47,7 @@ Neste stack, a cada `tf-apply`:
 | Apex `<domínio>` | A → `gateway_entry_ip` (Hostinger Zone Editor) |
 | Entrada oficial | `https://<domínio>/auth` e `https://<domínio>/api/...` |
 
-Backends do Gateway (defaults): `https://auth.<domínio>` e `https://api.<domínio>`.
+Backends do Gateway: `https://auth.<domínio>` e `https://api.<domínio>`.
 
 O Ingress + ManagedCertificate de `api.…` ficam no repo `api`. A managed zone e os nameservers no registrador ficam no `infra-bootstrap`.
 
