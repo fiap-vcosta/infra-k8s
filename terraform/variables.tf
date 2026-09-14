@@ -103,3 +103,21 @@ variable "api_static_ip_name" {
   description = "Nome do IP global reservado para o Ingress HTTPS da API."
   default     = "tech-challenge-api"
 }
+
+variable "gateway_api_id" {
+  type        = string
+  description = "ID do API Gateway API (recurso google_api_gateway_api)."
+  default     = "tech-challenge"
+}
+
+variable "gateway_id" {
+  type        = string
+  description = "ID do recurso google_api_gateway_gateway (e prefixo dos recursos do LB de entrada)."
+  default     = "tech-challenge"
+}
+
+variable "gateway_entry_ip_name" {
+  type        = string
+  description = "Nome do IP global da entrada publica (apex → API Gateway via HTTPS LB)."
+  default     = "tech-challenge-entry"
+}

@@ -37,3 +37,18 @@ output "auth_hostname" {
   description = "Hostname DNS do auth (CNAME → ghs.googlehosted.com)."
   value       = local.auth_hostname
 }
+
+output "gateway_entry_ip" {
+  description = "IP global do HTTPS LB da entrada (A do apex na Hostinger)."
+  value       = google_compute_global_address.gateway_entry.address
+}
+
+output "gateway_entry_ip_name" {
+  description = "Nome do recurso do IP de entrada."
+  value       = google_compute_global_address.gateway_entry.name
+}
+
+output "gateway_entry_hostname" {
+  description = "Hostname publico da entrada (apex do dominio)."
+  value       = local.gateway_entry_hostname
+}

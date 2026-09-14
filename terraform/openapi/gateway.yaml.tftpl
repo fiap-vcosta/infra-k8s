@@ -1,0 +1,88 @@
+swagger: "2.0"
+info:
+  title: tech-challenge
+  description: Entrada unica /auth (Cloud Run) e /api (GKE HTTPS).
+  version: "1.0.0"
+host: ${entry_hostname}
+schemes:
+  - https
+produces:
+  - application/json
+consumes:
+  - application/json
+paths:
+  /auth:
+    post:
+      operationId: authEmitirToken
+      summary: Documento para JWT cliente
+      x-google-backend:
+        address: ${auth_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 30.0
+      responses:
+        "200":
+          description: JWT emitido
+        "400":
+          description: Documento invalido
+        "404":
+          description: Cliente nao encontrado
+        "502":
+          description: Falha ao consultar a API
+  /api/{path=**}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        type: string
+        description: Caminho restante apos /api/
+    get:
+      operationId: apiGet
+      x-google-backend:
+        address: ${api_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 60.0
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: apiPost
+      x-google-backend:
+        address: ${api_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 60.0
+      responses:
+        "200":
+          description: OK
+    put:
+      operationId: apiPut
+      x-google-backend:
+        address: ${api_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 60.0
+      responses:
+        "200":
+          description: OK
+    patch:
+      operationId: apiPatch
+      x-google-backend:
+        address: ${api_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 60.0
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: apiDelete
+      x-google-backend:
+        address: ${api_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 60.0
+      responses:
+        "200":
+          description: OK
