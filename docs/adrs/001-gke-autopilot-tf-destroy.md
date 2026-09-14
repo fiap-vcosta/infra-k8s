@@ -13,8 +13,9 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 ## 2. Decisão
 
 - **Cluster:** GKE **Autopilot** regional `tech-challenge-gke` em `us-central1`, VPC-native (rede do `infra-bootstrap`), nós privados.
+- **Egress:** **Cloud NAT** na subnet da demo (neste stack), para HTTPS externo dos nós privados (ex.: Datadog). Não mora no `infra-bootstrap` (custo por hora da janela).
 - **Control plane:** **DNS-only** (acesso por DNS + IAM; sem endpoint IP nem lista de IPs autorizados).
-- **Escopo deste repo:** cluster + binding de Workload Identity da KSA da API. **Manifests da aplicação ficam no repo `api`.**
+- **Escopo deste repo:** cluster + NAT + binding de Workload Identity da KSA da API. **Manifests da aplicação ficam no repo `api`.**
 - **Ciclo de vida:** `tf-apply` / `tf-destroy` **manuais** (`workflow_dispatch`). `tf-destroy` apaga o state inteiro deste stack (sem carve-outs) e, **antes** do destroy, remove Services `LoadBalancer` do cluster para não deixar forwarding rule órfã cobrada.
 
 ## 3. Justificativa
