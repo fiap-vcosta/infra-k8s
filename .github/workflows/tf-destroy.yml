@@ -112,8 +112,5 @@ jobs:
       - name: Terraform init
         run: terraform init -input=false
 
-      - name: Clear Cloud Run deletion_protection
-        run: terraform apply -input=false -auto-approve -target=google_cloud_run_v2_service.auth
-
       - name: Terraform destroy
         run: terraform destroy -input=false -auto-approve
