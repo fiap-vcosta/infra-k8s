@@ -39,7 +39,7 @@ output "auth_hostname" {
 }
 
 output "gateway_entry_ip" {
-  description = "IP global do HTTPS LB da entrada (A do apex na Hostinger)."
+  description = "IP global do HTTPS LB da entrada (A do apex no Cloud DNS)."
   value       = google_compute_global_address.gateway_entry.address
 }
 

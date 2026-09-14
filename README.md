@@ -8,7 +8,7 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP — Tech Challenge FIAP 
 - Control plane só por **DNS endpoint** (autenticação IAM), sem endpoint IP
 - Binding de Workload Identity da service account Kubernetes da API sobre a service account de runtime
 - Cloud Run **`auth`** (imagem do repo [`auth`](https://github.com/fiap-vcosta/auth)) — sobe e desce com este stack
-- IP global + records Cloud DNS `api.<domínio>` (A) e `auth.<domínio>` (CNAME) + domain mapping do Cloud Run auth
+- IPs globais + records Cloud DNS `api.<domínio>` (A), `auth.<domínio>` (CNAME) e apex (A) + domain mapping do Cloud Run auth
 - **API Gateway** + HTTPS LB no apex (`https://<domínio>/auth` e `/api`) com backends HTTPS nomeados
 - State remoto em GCS (o bucket é do `infra-bootstrap` e não morre no destroy)
 
@@ -44,16 +44,16 @@ Neste stack, a cada `tf-apply`:
 | IP `tech-challenge-entry` | HTTPS LB da **entrada** (apex → Gateway) — output `gateway_entry_ip` |
 | `api.<domínio>` | A → IP da API (backend do Gateway) |
 | `auth.<domínio>` | CNAME → `ghs.googlehosted.com` + domain mapping |
-| Apex `<domínio>` | A → `gateway_entry_ip` (Hostinger Zone Editor) |
+| Apex `<domínio>` | A → `gateway_entry_ip` (Cloud DNS, este stack) |
 | Entrada oficial | `https://<domínio>/auth` e `https://<domínio>/api/...` |
 
 Backends do Gateway: `https://auth.<domínio>` e `https://api.<domínio>`.
 
 O Ingress + ManagedCertificate de `api.…` ficam no repo `api`. A managed zone e os nameservers no registrador ficam no `infra-bootstrap`.
 
-Pré-requisito do Gateway: `https://api.…` com cert Active e auth HTTPS. Ordem: `tf-apply` (cluster + auth + DNS) → DNS `api`/`auth` → `deploy` API → cert Active → **`tf-apply` de novo** (Gateway + LB de entrada) → **A do apex** na Hostinger → esperar cert do apex Active.
+Pré-requisito do Gateway: `https://api.…` com cert Active e auth HTTPS. Ordem: `tf-apply` (cluster + auth + records Cloud DNS `api`/`auth`/apex + Gateway/LB) → `deploy` API → esperar ManagedCertificate Active em `api.…` e o cert do apex Active.
 
-**Custo:** na janela há **dois** IPs/LBs globais (API + entrada). Ambos saem no `tf-destroy`. O site Hostinger no `@` deixa de responder quando o A do apex aponta para a GCP.
+**Custo:** na janela há **dois** IPs/LBs globais (API + entrada). Ambos saem no `tf-destroy`. Os records da janela (incluindo o apex) sobem e descem com este stack; no destroy o apex deixa de resolver até o próximo apply.
 
 ## Acesso ao cluster
 
@@ -100,13 +100,10 @@ terraform validate
 1. `infra-bootstrap` aplicado (zona Cloud DNS + NS no registrador, uma vez)
 2. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
 3. `infra-db` → `tf-apply`
-4. Este repo → `tf-apply` (Autopilot + Cloud Run auth + DNS/IP da API)
-5. DNS Hostinger: **A** `api` → `api_static_ip`; **CNAME** `auth` → `ghs.googlehosted.com`
-6. `api` → Ingress/cert + `deploy`; esperar ManagedCertificate **Active** em `api.…`
-7. Este repo → **`tf-apply` de novo** (API Gateway + LB de entrada + cert do apex)
-8. DNS Hostinger: **A** `@` (apex) → output `gateway_entry_ip` (substitui o IP do site Hostinger)
-9. Esperar cert do apex Active → smoke `https://vcosta-fiap.online/auth` e `/api/...`
-10. Destroy inverso: este repo → `infra-db`
+4. Este repo → `tf-apply` (Autopilot + Cloud Run auth + records Cloud DNS `api`/`auth`/apex + Gateway/LB)
+5. `api` → Ingress/cert + `deploy`; esperar ManagedCertificate **Active** em `api.…`
+6. Esperar cert do apex Active → smoke `https://vcosta-fiap.online/auth` e `/api/...`
+7. Destroy inverso: este repo → `infra-db`
 
 O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e não entra nesse ciclo.
 

@@ -39,3 +39,11 @@ resource "google_dns_record_set" "auth" {
   ttl          = 300
   rrdatas      = ["ghs.googlehosted.com."]
 }
+
+resource "google_dns_record_set" "apex" {
+  name         = "${local.dns_name}."
+  managed_zone = local.dns_zone_name
+  type         = "A"
+  ttl          = 300
+  rrdatas      = [google_compute_global_address.gateway_entry.address]
+}
