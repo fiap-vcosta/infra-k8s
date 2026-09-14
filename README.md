@@ -6,6 +6,7 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP — Tech Challenge FIAP 
 
 - Cluster GKE Autopilot regional `tech-challenge-gke` em `us-central1`, VPC-native na rede do `infra-bootstrap`
 - Control plane só por **DNS endpoint** (autenticação IAM), sem endpoint IP
+- **Cloud NAT** na subnet da demo (egress HTTPS dos nós privados — Datadog Agent/sink; sobe e desce com este stack)
 - Binding de Workload Identity da service account Kubernetes da API sobre a service account de runtime
 - Cloud Run **`auth`** (imagem do repo [`auth`](https://github.com/fiap-vcosta/auth)) — sobe e desce com este stack
 - IPs globais + records Cloud DNS `api.<domínio>` (A), `auth.<domínio>` (CNAME) e apex (A) + domain mapping do Cloud Run auth
