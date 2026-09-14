@@ -112,22 +112,8 @@ variable "gateway_api_id" {
 
 variable "gateway_id" {
   type        = string
-  description = "ID do gateway HTTP (hostname *.gateway.dev)."
+  description = "ID do recurso google_api_gateway_gateway (e prefixo dos recursos do LB de entrada)."
   default     = "tech-challenge"
-}
-
-variable "gateway_auth_backend_url" {
-  type        = string
-  nullable    = true
-  default     = null
-  description = "Backend HTTPS de /auth. Null = https://<auth_hostname>."
-}
-
-variable "gateway_api_backend_url" {
-  type        = string
-  nullable    = true
-  default     = null
-  description = "Backend HTTPS de /api. Null = https://<api_hostname>."
 }
 
 variable "gateway_entry_ip_name" {

@@ -1,9 +1,7 @@
 locals {
-  gateway_auth_backend_url = coalesce(var.gateway_auth_backend_url, "https://${local.auth_hostname}")
-  gateway_api_backend_url  = coalesce(var.gateway_api_backend_url, "https://${local.api_hostname}")
   gateway_openapi = templatefile("${path.module}/openapi/gateway.yaml.tftpl", {
-    auth_backend_url = local.gateway_auth_backend_url
-    api_backend_url  = local.gateway_api_backend_url
+    auth_backend_url = "https://${local.auth_hostname}"
+    api_backend_url  = "https://${local.api_hostname}"
     entry_hostname   = local.dns_name
   })
   gateway_openapi_hash = substr(sha256(local.gateway_openapi), 0, 8)
