@@ -14,4 +14,4 @@ alwaysApply: true
 - Não commitar kubeconfig, chaves SA, tfvars secretos.
 - CI barato: `fmt` + `validate` (+ `plan` em PR); CD caro = `workflow_dispatch`; root module em `terraform/`.
 - Gateway depois dos backends (auth URL + API); não inventar staging.
-- README sem referências a checklist interno (§N) nem a pastas só do workspace local.
+- README autocontido: sem referências a pastas fora do Git nem a numeração de documentos pessoais.

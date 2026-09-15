@@ -17,6 +17,68 @@ Este stack entrega **cluster, identidade, auth, DNS da janela e API Gateway**. O
 
 Root module: [`terraform/`](terraform/).
 
+## Componentes (nuvem)
+
+```mermaid
+flowchart TB
+  internet["Internet / Cliente"]
+
+  subgraph bootstrap["infra-bootstrap persistente"]
+    dns["Cloud DNS zona vcosta-fiap.online"]
+    ar[("Artifact Registry")]
+    vpc["VPC + subnet + PSA"]
+  end
+
+  subgraph k8s["infra-k8s janela"]
+    entryIp["HTTPS LB apex"]
+    gw["API Gateway"]
+    authRun["Cloud Run auth GEN1 128Mi"]
+    apiIp["IP tech-challenge-api"]
+    nat["Cloud NAT"]
+    subgraph gke["GKE Autopilot"]
+      ing["Ingress + ManagedCertificate"]
+      svc["Service ClusterIP"]
+      subgraph pod["Pod"]
+        api["API .NET"]
+        proxy["Cloud SQL Auth Proxy"]
+        dd["Datadog Agent"]
+      end
+      hpa["HPA"]
+    end
+  end
+
+  subgraph dbStack["infra-db janela"]
+    sql[("Cloud SQL PostgreSQL")]
+    sm[("Secret Manager senha")]
+  end
+
+  datadog["Datadog APM / logs"]
+
+  internet --> dns
+  dns -->|"A apex"| entryIp
+  dns -->|"A api"| apiIp
+  dns -->|"CNAME auth"| authRun
+  entryIp --> gw
+  gw -->|"/auth"| authRun
+  gw -->|"/api"| apiIp
+  apiIp --> ing
+  ing --> svc
+  svc --> api
+  hpa -.->|"escala"| api
+  api -->|"127.0.0.1:5432"| proxy
+  proxy -->|"IP privado + IAM"| sql
+  vpc -.-> sql
+  vpc -.-> gke
+  ar -.->|"imagem :latest"| api
+  ar -.->|"imagem :latest"| authRun
+  sm -.->|"senha no deploy"| api
+  authRun -->|"HTTPS X-Service-Key"| api
+  nat -->|"egress"| datadog
+  dd -->|"APM + logs"| datadog
+```
+
+Entrada oficial: `https://vcosta-fiap.online/auth` e `https://vcosta-fiap.online/api/...`. Sequência documento → JWT → aprovar: README do [`auth`](https://github.com/fiap-vcosta/auth). Modelo de dados: [`api/docs/08_modelo-de-dados.md`](https://github.com/fiap-vcosta/api/blob/main/docs/08_modelo-de-dados.md).
+
 ## Contrato com o repo `api`
 
 O binding em [`terraform/workload-identity.tf`](terraform/workload-identity.tf) autoriza uma service account Kubernetes específica a assumir a service account GCP de runtime:
@@ -50,7 +112,7 @@ Neste stack, a cada `tf-apply`:
 
 Backends do Gateway: `https://auth.<domínio>` e `https://api.<domínio>`.
 
-O Ingress + ManagedCertificate de `api.…` ficam no repo `api`. A managed zone e os nameservers no registrador ficam no `infra-bootstrap`.
+O Ingress + ManagedCertificate de `api.…` ficam no repo `api`. A managed zone é do `infra-bootstrap`; os nameservers do domínio já apontam para o Google (`ns-cloud-c*`), então os records deste stack respondem na internet a cada `tf-apply`.
 
 Pré-requisito do Gateway: `https://api.…` com cert Active e auth HTTPS. Ordem: `tf-apply` (cluster + auth + records Cloud DNS `api`/`auth`/apex + Gateway/LB) → `deploy` API → esperar ManagedCertificate Active em `api.…` e o cert do apex Active.
 
@@ -83,7 +145,7 @@ Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_W
 
 Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:latest` no Artifact Registry).
 
-No `tf-apply`, `API_BASE_URL` do auth sai de `DOMAIN` (`https://api.<DOMAIN>`). A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`.
+No `tf-apply`, `API_BASE_URL` do auth sai de `DOMAIN` (`https://api.<DOMAIN>`). A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`. Custo mínimo: GEN1 + 128Mi + `cpu_idle` — [ADR 003](docs/adrs/003-cloud-run-auth-gen1.md).
 
 O `tf-destroy` deste repo remove Cloud Run auth, domain mapping, records DNS, IPs globais, API Gateway e o HTTPS LB de entrada **junto** com o cluster.
 
@@ -98,7 +160,7 @@ terraform validate
 
 ## Ordem na demo
 
-1. `infra-bootstrap` aplicado (zona Cloud DNS + NS no registrador, uma vez)
+1. `infra-bootstrap` aplicado (zona Cloud DNS + NS Google no domínio, uma vez)
 2. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
 3. `infra-db` → `tf-apply`
 4. Este repo → `tf-apply` (Autopilot + Cloud Run auth + records Cloud DNS `api`/`auth`/apex + Gateway/LB)
@@ -110,7 +172,17 @@ O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e 
 
 ## Decisões (ADRs)
 
-Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy` e API Gateway.
+Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy`, API Gateway e Cloud Run `auth` (GEN1 / 128Mi / `cpu_idle`).
+
+## Repos da org
+
+| Repo | Papel | Diagrama / doc-chave |
+|------|--------|----------------------|
+| [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) | Rede, WIF, AR, zona DNS | Persistente |
+| [`infra-db`](https://github.com/fiap-vcosta/infra-db) | Cloud SQL | — |
+| [`infra-k8s`](https://github.com/fiap-vcosta/infra-k8s) | GKE + Gateway + Cloud Run auth | **Componentes (acima)** |
+| [`api`](https://github.com/fiap-vcosta/api) | App + manifests + Requestly | [ER / modelo de dados](https://github.com/fiap-vcosta/api/blob/main/docs/08_modelo-de-dados.md) |
+| [`auth`](https://github.com/fiap-vcosta/auth) | Imagem documento → JWT | Sequência no README |
 
 ## Agentes
 

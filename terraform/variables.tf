@@ -6,7 +6,7 @@ variable "project_id" {
 
 variable "region" {
   type        = string
-  description = "Região primária (fechada na Fase 03)."
+  description = "Região primária da demo (fechada: us-central1)."
   default     = "us-central1"
 }
 
