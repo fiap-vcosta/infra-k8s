@@ -8,5 +8,5 @@ alwaysApply: true
 - Root module em **`terraform/`** (não espalhar `.tf` na raiz); módulos reutilizáveis em `modules/` se necessário. Sem pasta de manifests: YAML de aplicação é do repo `api`.
 - CI Terraform: `working-directory: terraform` e pin da **versão estável recente** do Terraform.
 - **Sem comentários narrativos** em `.tf`. Comentário só em placeholder vazio (ex. `outputs.tf` sem outputs ainda).
-- **README:** lista de escopo (sem tabela inclui/não inclui); sem pastas só do workspace local; sem numeração de checklist interno (§N).
+- **README:** lista de escopo (sem tabela inclui/não inclui); autocontido — sem pastas fora do Git nem numeração de documentos pessoais.
 - `.gitignore` agrupado por seção (`# Terraform`, `# OS`, …).
