@@ -49,41 +49,33 @@ jobs:
         working-directory: terraform
     env:
       TF_VAR_cluster_name: ${{ vars.GCP_GKE_CLUSTER_NAME }}
-      TF_VAR_auth_jwt_cliente_key: ${{ secrets.JWT_CLIENTE_KEY }}
-      TF_VAR_auth_service_auth_key: ${{ secrets.SERVICE_AUTH_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Check required org vars and secrets
+      - name: Check required org vars
         working-directory: .
         env:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_AR_REPOSITORY: ${{ vars.GCP_AR_REPOSITORY }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
           GCP_GKE_CLUSTER_NAME: ${{ vars.GCP_GKE_CLUSTER_NAME }}
-          JWT_CLIENTE_KEY: ${{ secrets.JWT_CLIENTE_KEY }}
-          SERVICE_AUTH_KEY: ${{ secrets.SERVICE_AUTH_KEY }}
-          DOMAIN: ${{ vars.DOMAIN }}
         run: |
           missing=()
-          for name in GCP_PROJECT_ID GCP_REGION GCP_AR_REPOSITORY \
+          for name in GCP_PROJECT_ID GCP_REGION \
                       GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT_EMAIL \
-                      GCP_GKE_CLUSTER_NAME DOMAIN JWT_CLIENTE_KEY SERVICE_AUTH_KEY; do
+                      GCP_GKE_CLUSTER_NAME; do
             [[ -n "${!name}" ]] || missing+=("$name")
           done
           if (( ${#missing[@]} > 0 )); then
-            echo "vars/secrets faltando: ${missing[*]}" >&2
+            echo "vars faltando: ${missing[*]}" >&2
             exit 1
           fi
 
           {
             echo "TF_VAR_project_id=$GCP_PROJECT_ID"
             echo "TF_VAR_region=$GCP_REGION"
-            echo "TF_VAR_artifact_registry_repository=$GCP_AR_REPOSITORY"
-            echo "TF_VAR_auth_api_base_url=https://api.${DOMAIN}"
           } >> "$GITHUB_ENV"
 
       - name: Authenticate to Google Cloud

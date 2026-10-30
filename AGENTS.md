@@ -1,6 +1,6 @@
 # Tech Challenge — Guia para agentes (`infra-k8s`)
 
-Terraform do **GKE Autopilot** que hospeda a API na GCP. Org [fiap-vcosta](https://github.com/fiap-vcosta). Rede e WIF em `infra-bootstrap`; banco em `infra-db`; manifests e deploy no repo `api`; Function em `auth`.
+Terraform do **GKE Autopilot** que hospeda os serviços na GCP. Org [fiap-vcosta](https://github.com/fiap-vcosta). Rede e WIF em `infra-bootstrap`; banco em `infra-db`. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço.
 
 ## Antes de mudar código
 
@@ -13,17 +13,18 @@ Terraform do **GKE Autopilot** que hospeda a API na GCP. Org [fiap-vcosta](https
 
 | Peça | Papel |
 |------|--------|
-| Terraform | Cluster Autopilot, binding WI da KSA da API, Cloud Run `auth`, IP/DNS da janela, API Gateway + HTTPS LB no apex |
+| Terraform | Cluster Autopilot, bindings WI das cinco KSAs, IP/DNS da janela, certificado de `api.<domínio>`, API Gateway + HTTPS LB no apex |
+| Workflow | Aplica e apaga o Gateway do GKE (`terraform/gke-gateway.yaml.tpl`) em volta do `tf-apply` / `tf-destroy` |
 | Rede / zona DNS | **Consumidas** do `infra-bootstrap` via `terraform_remote_state` |
 | State | Backend remoto **persistente** entre demos |
-| Fora de escopo | Manifests/deploy da API (repo `api`), código/imagem do auth (repo `auth` só `build-push`), VPC/subnet/PSA, zona Cloud DNS, Cloud SQL |
+| Fora de escopo | `HTTPRoute` e deploy de cada serviço, VPC/subnet/PSA, zona Cloud DNS, Cloud SQL |
 
 ## Regras canônicas (resumo)
 
 - Autopilot; apply/destroy manuais
-- **YAML de aplicação da API não mora aqui**; o serviço Cloud Run do auth sim (mesmo ciclo da demo)
+- O Gateway do GKE é manifesto deste repo, aplicado no workflow. O `HTTPRoute` público de cada serviço fica no repositório do serviço, no listener `https`
 - Rede e zona DNS não se criam aqui; se falta algo na VPC/zona, o PR é no `infra-bootstrap`
-- Namespace `tech-challenge` e KSA `api` são contrato com os manifests do repo `api`
+- Namespace `tech-challenge`. KSA com o mesmo nome do account id da service account de runtime
 - State não morre no destroy da demo
 - Sem secrets no Git; Kind não é entrega
 

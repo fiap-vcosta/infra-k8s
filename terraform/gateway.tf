@@ -1,8 +1,19 @@
 locals {
+  gateway_prefixes = {
+    administrativo = "administrativo"
+    autenticacao   = "autenticacao"
+    estoque        = "estoque"
+    orcamento      = "orcamento"
+    ordem-servico  = "ordemServico"
+  }
+
+  gateway_methods = ["get", "post", "put", "patch", "delete"]
+
   gateway_openapi = templatefile("${path.module}/openapi/gateway.yaml.tftpl", {
-    auth_backend_url = "https://${local.auth_hostname}"
-    api_backend_url  = "https://${local.api_hostname}"
-    entry_hostname   = local.dns_name
+    api_backend_url = "https://${local.api_hostname}"
+    entry_hostname  = local.dns_name
+    prefixes        = local.gateway_prefixes
+    methods         = local.gateway_methods
   })
   gateway_openapi_hash = substr(sha256(local.gateway_openapi), 0, 8)
 }

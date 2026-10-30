@@ -1,7 +1,7 @@
 swagger: "2.0"
 info:
   title: tech-challenge
-  description: Entrada unica /auth (Cloud Run) e /api (GKE HTTPS).
+  description: Entrada no apex. O path inteiro segue para o Gateway do GKE.
   version: "1.0.0"
 host: ${entry_hostname}
 schemes:
@@ -11,33 +11,41 @@ produces:
 consumes:
   - application/json
 paths:
-  /auth:
+  /orcamento/webhook/mercado-pago:
     post:
-      operationId: authEmitirToken
-      summary: Documento para JWT cliente
+      operationId: orcamentoWebhookMercadoPago
+      summary: Webhook Mercado Pago, anonimo neste gateway
       x-google-backend:
-        address: ${auth_backend_url}
+        address: ${api_backend_url}
         path_translation: APPEND_PATH_TO_ADDRESS
         disable_auth: true
-        deadline: 30.0
+        deadline: 60.0
       responses:
         "200":
-          description: JWT emitido
-        "400":
-          description: Documento invalido
-        "404":
-          description: Cliente nao encontrado
-        "502":
-          description: Falha ao consultar a API
-  /api/{path=**}:
+          description: OK
+%{ for prefix, id in prefixes ~}
+  /${prefix}:
+%{ for method in methods ~}
+    ${method}:
+      operationId: ${id}${title(method)}
+      x-google-backend:
+        address: ${api_backend_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+        deadline: 60.0
+      responses:
+        "200":
+          description: OK
+%{ endfor ~}
+  /${prefix}/{path=**}:
     parameters:
       - name: path
         in: path
         required: true
         type: string
-        description: Caminho restante apos /api/
-    get:
-      operationId: apiGet
+%{ for method in methods ~}
+    ${method}:
+      operationId: ${id}Proxy${title(method)}
       x-google-backend:
         address: ${api_backend_url}
         path_translation: APPEND_PATH_TO_ADDRESS
@@ -46,43 +54,5 @@ paths:
       responses:
         "200":
           description: OK
-    post:
-      operationId: apiPost
-      x-google-backend:
-        address: ${api_backend_url}
-        path_translation: APPEND_PATH_TO_ADDRESS
-        disable_auth: true
-        deadline: 60.0
-      responses:
-        "200":
-          description: OK
-    put:
-      operationId: apiPut
-      x-google-backend:
-        address: ${api_backend_url}
-        path_translation: APPEND_PATH_TO_ADDRESS
-        disable_auth: true
-        deadline: 60.0
-      responses:
-        "200":
-          description: OK
-    patch:
-      operationId: apiPatch
-      x-google-backend:
-        address: ${api_backend_url}
-        path_translation: APPEND_PATH_TO_ADDRESS
-        disable_auth: true
-        deadline: 60.0
-      responses:
-        "200":
-          description: OK
-    delete:
-      operationId: apiDelete
-      x-google-backend:
-        address: ${api_backend_url}
-        path_translation: APPEND_PATH_TO_ADDRESS
-        disable_auth: true
-        deadline: 60.0
-      responses:
-        "200":
-          description: OK
+%{ endfor ~}
+%{ endfor ~}

@@ -1,8 +1,10 @@
 # ADR 003: Cloud Run `auth` com GEN1, 128Mi e `cpu_idle`
 
 **Data:** 14 de Setembro de 2026  
-**Status:** Aceito  
+**Status:** Substituída pela [ADR 004](004-gke-gateway-api.md)  
 **Autores:** Victor Costa
+
+O texto abaixo registra a decisão original. O Cloud Run `auth` saiu do caminho oficial.
 
 ## 1. Contexto e Problema
 
@@ -37,7 +39,7 @@ O problema a ser resolvido é: **Qual execution environment, memória e modelo d
 ### Positivas
 
 * Auth barato e alinhado ao destroy da demo.
-* ADR deixa explícito o que o Terraform já aplica em [`terraform/auth.tf`](../../terraform/auth.tf).
+* ADR deixa explícito o que o Terraform aplicava em `terraform/auth.tf`, removido na ADR 004.
 
 ### Negativas / Riscos (Mitigações)
 

@@ -5,13 +5,13 @@ alwaysApply: true
 
 # Restrições do projeto (`infra-k8s`)
 
-- Escopo: **Terraform** do cluster **GKE Autopilot**, identidade da API e **Cloud Run `auth`** — **não** Cloud SQL (repo `infra-db`), **não** rede/WIF (repo `infra-bootstrap`).
-- **YAML de aplicação da API não mora aqui:** manifests e workflow de deploy vivem no repo `api`. Imagem do auth é buildada no repo `auth`; o serviço Cloud Run é deste stack.
+- Escopo: **Terraform** do cluster **GKE Autopilot**, bindings de Workload Identity, Gateway do GKE e API Gateway — **não** Cloud SQL (repo `infra-db`), **não** rede/WIF (repo `infra-bootstrap`).
+- O manifesto do Gateway do GKE mora em `terraform/` e o workflow aplica. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço.
 - GKE = **Autopilot** (fechado); Standard só plano B se quota Autopilot falhar.
 - Kind / self-hosted aposentados na entrega; não ressuscitar como caminho oficial.
 - **`terraform apply` / destroy** e deploy de app só **manual** — merge em `main` não liga cluster.
 - Bucket de **state** remoto fora do destroy da demo.
 - Não commitar kubeconfig, chaves SA, tfvars secretos.
 - CI barato: `fmt` + `validate` (+ `plan` em PR); CD caro = `workflow_dispatch`; root module em `terraform/`.
-- Gateway depois dos backends (auth URL + API); não inventar staging.
+- Gateway do GKE e API Gateway sobem neste stack, antes do deploy dos serviços. Sem `/system` no OpenAPI.
 - README autocontido: sem referências a pastas fora do Git nem a numeração de documentos pessoais.

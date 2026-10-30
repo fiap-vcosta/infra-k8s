@@ -2,7 +2,6 @@ locals {
   dns_zone_name = data.terraform_remote_state.bootstrap.outputs.dns_managed_zone_name
   dns_name      = trimsuffix(data.terraform_remote_state.bootstrap.outputs.dns_name, ".")
   api_hostname  = "api.${local.dns_name}"
-  auth_hostname = "auth.${local.dns_name}"
 }
 
 resource "google_compute_global_address" "api" {
@@ -19,25 +18,12 @@ resource "google_dns_record_set" "api" {
   rrdatas      = [google_compute_global_address.api.address]
 }
 
-resource "google_cloud_run_domain_mapping" "auth" {
-  location = var.region
-  name     = local.auth_hostname
+resource "google_compute_managed_ssl_certificate" "api" {
+  name = var.api_ssl_certificate_name
 
-  metadata {
-    namespace = var.project_id
+  managed {
+    domains = [local.api_hostname]
   }
-
-  spec {
-    route_name = google_cloud_run_v2_service.auth.name
-  }
-}
-
-resource "google_dns_record_set" "auth" {
-  name         = "${local.auth_hostname}."
-  managed_zone = local.dns_zone_name
-  type         = "CNAME"
-  ttl          = 300
-  rrdatas      = ["ghs.googlehosted.com."]
 }
 
 resource "google_dns_record_set" "apex" {
