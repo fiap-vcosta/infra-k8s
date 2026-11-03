@@ -21,48 +21,33 @@ jobs:
         working-directory: terraform
     env:
       TF_VAR_cluster_name: ${{ vars.GCP_GKE_CLUSTER_NAME }}
-      TF_VAR_auth_jwt_cliente_key: ${{ secrets.JWT_CLIENTE_KEY }}
-      TF_VAR_auth_service_auth_key: ${{ secrets.SERVICE_AUTH_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Check required org vars and secrets
+      - name: Check required org vars
         working-directory: .
         env:
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_AR_REPOSITORY: ${{ vars.GCP_AR_REPOSITORY }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT_EMAIL: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
           GCP_GKE_CLUSTER_NAME: ${{ vars.GCP_GKE_CLUSTER_NAME }}
-          DOMAIN: ${{ vars.DOMAIN }}
-          JWT_CLIENTE_KEY: ${{ secrets.JWT_CLIENTE_KEY }}
-          SERVICE_AUTH_KEY: ${{ secrets.SERVICE_AUTH_KEY }}
-          JWT_CLIENTE_ISSUER: ${{ vars.JWT_CLIENTE_ISSUER }}
-          JWT_CLIENTE_AUDIENCE: ${{ vars.JWT_CLIENTE_AUDIENCE }}
         run: |
           missing=()
-          for name in GCP_PROJECT_ID GCP_REGION GCP_AR_REPOSITORY \
+          for name in GCP_PROJECT_ID GCP_REGION \
                       GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT_EMAIL \
-                      GCP_GKE_CLUSTER_NAME DOMAIN JWT_CLIENTE_KEY SERVICE_AUTH_KEY; do
+                      GCP_GKE_CLUSTER_NAME; do
             [[ -n "${!name}" ]] || missing+=("$name")
           done
           if (( ${#missing[@]} > 0 )); then
-            echo "vars/secrets faltando: ${missing[*]}" >&2
+            echo "vars faltando: ${missing[*]}" >&2
             exit 1
           fi
-
-          JWT_CLIENTE_ISSUER="${JWT_CLIENTE_ISSUER:-tech-challenge-cliente}"
-          JWT_CLIENTE_AUDIENCE="${JWT_CLIENTE_AUDIENCE:-tech-challenge-cliente}"
 
           {
             echo "TF_VAR_project_id=$GCP_PROJECT_ID"
             echo "TF_VAR_region=$GCP_REGION"
-            echo "TF_VAR_artifact_registry_repository=$GCP_AR_REPOSITORY"
-            echo "TF_VAR_auth_api_base_url=https://api.${DOMAIN}"
-            echo "TF_VAR_auth_jwt_cliente_issuer=$JWT_CLIENTE_ISSUER"
-            echo "TF_VAR_auth_jwt_cliente_audience=$JWT_CLIENTE_AUDIENCE"
           } >> "$GITHUB_ENV"
 
       - name: Authenticate to Google Cloud
@@ -70,6 +55,11 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: gke-gcloud-auth-plugin
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -83,19 +73,48 @@ jobs:
       - name: Terraform apply
         run: terraform apply -input=false -auto-approve
 
+      - name: Apply GKE Gateway
+        env:
+          CLUSTER_NAME: ${{ vars.GCP_GKE_CLUSTER_NAME }}
+          CLUSTER_LOCATION: ${{ vars.GCP_REGION }}
+        run: |
+          set -euo pipefail
+          gcloud container clusters get-credentials "$CLUSTER_NAME" \
+            --region "$CLUSTER_LOCATION" --dns-endpoint
+          for _ in $(seq 1 60); do
+            if kubectl get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1; then
+              break
+            fi
+            sleep 10
+          done
+          kubectl get crd gateways.gateway.networking.k8s.io >/dev/null
+          export NAMESPACE="$(terraform output -raw k8s_namespace)"
+          export GATEWAY_NAME="$(terraform output -raw gke_gateway_name)"
+          export API_HOSTNAME="$(terraform output -raw api_hostname)"
+          export STATIC_IP_NAME="$(terraform output -raw api_static_ip_name)"
+          export SSL_CERTIFICATE_NAME="$(terraform output -raw api_ssl_certificate_name)"
+          envsubst '${NAMESPACE} ${GATEWAY_NAME} ${API_HOSTNAME} ${STATIC_IP_NAME} ${SSL_CERTIFICATE_NAME}' \
+            < gke-gateway.yaml.tpl > /tmp/gke-gateway.yaml
+          kubectl apply -f /tmp/gke-gateway.yaml
+          kubectl wait --namespace "$NAMESPACE" --for=condition=Programmed "gateway/${GATEWAY_NAME}" --timeout=900s
+          echo "SSL_CERTIFICATE_NAME=$SSL_CERTIFICATE_NAME" >> "$GITHUB_ENV"
+
       - name: Resumo
         run: |
           set -euo pipefail
+          cert_status="$(gcloud compute ssl-certificates describe "$SSL_CERTIFICATE_NAME" --global --format='value(managed.status)')"
           {
             echo "## infra-k8s aplicado"
             echo ""
             echo "- Cluster: \`$(terraform output -raw cluster_name)\`"
-            echo "- Auth URL (run.app): \`$(terraform output -raw auth_service_uri)\`"
-            echo "- Auth hostname: \`$(terraform output -raw auth_hostname)\`"
-            echo "- API hostname: \`$(terraform output -raw api_hostname)\`"
-            echo "- API static IP: \`$(terraform output -raw api_static_ip)\` (\`$(terraform output -raw api_static_ip_name)\`)"
-            echo "- Auth image: \`$(terraform output -raw auth_image)\`"
-            echo "- Auth API_BASE_URL: \`https://api.${{ vars.DOMAIN }}\`"
+            echo "- Namespace: \`$(terraform output -raw k8s_namespace)\`"
+            echo "- Gateway do GKE: \`$(terraform output -raw gke_gateway_name)\` (listener \`https\`)"
+            echo "- Backend: \`https://$(terraform output -raw api_hostname)\`"
+            echo "- IP do backend: \`$(terraform output -raw api_static_ip)\` (\`$(terraform output -raw api_static_ip_name)\`)"
+            echo "- Certificado do backend: \`$SSL_CERTIFICATE_NAME\` ($cert_status)"
             echo "- Entrada (apex): \`https://$(terraform output -raw gateway_entry_hostname)\`"
             echo "- Entrada IP (A do apex no Cloud DNS): \`$(terraform output -raw gateway_entry_ip)\` (\`$(terraform output -raw gateway_entry_ip_name)\`)"
+            echo ""
+            echo "Sem HTTPRoute de serviço, o prefixo público responde 404 no Gateway do GKE. \`/system\` não está no OpenAPI."
+            echo "O certificado do backend precisa estar Active antes do API Gateway conseguir chamá-lo."
           } >> "$GITHUB_STEP_SUMMARY"

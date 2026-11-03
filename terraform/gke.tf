@@ -17,6 +17,10 @@ resource "google_container_cluster" "main" {
     channel = var.release_channel
   }
 
+  gateway_api_config {
+    channel = "CHANNEL_STANDARD"
+  }
+
   private_cluster_config {
     enable_private_nodes = true
   }

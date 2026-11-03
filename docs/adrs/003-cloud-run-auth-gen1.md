@@ -1,7 +1,7 @@
 # ADR 003: Cloud Run `auth` com GEN1, 128Mi e `cpu_idle`
 
 **Data:** 14 de Setembro de 2026  
-**Status:** Aceito  
+**Status:** Substituída pela [ADR 004](004-gke-gateway-api.md)  
 **Autores:** Victor Costa
 
 ## 1. Contexto e Problema

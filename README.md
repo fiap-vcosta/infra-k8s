@@ -1,21 +1,21 @@
 # infra-k8s
 
-Terraform do **GKE Autopilot** que hospeda a API na GCP — Tech Challenge FIAP ([fiap-vcosta](https://github.com/fiap-vcosta)).
+Terraform do **GKE Autopilot** que hospeda os serviços na GCP — Tech Challenge FIAP ([fiap-vcosta](https://github.com/fiap-vcosta)).
 
 ## Escopo
 
-- Cluster GKE Autopilot regional `tech-challenge-gke` em `us-central1`, VPC-native na rede do `infra-bootstrap`
+- Cluster GKE Autopilot regional `tech-challenge-gke` em `us-central1`, VPC-native na rede do `infra-bootstrap`, com Gateway API no canal `CHANNEL_STANDARD`
 - Control plane só por **DNS endpoint** (autenticação IAM), sem endpoint IP
 - **Cloud NAT** na subnet da demo (egress HTTPS dos nós privados — Datadog Agent/sink; sobe e desce com este stack)
-- Binding de Workload Identity da service account Kubernetes da API sobre a service account de runtime
-- Cloud Run **`auth`** (imagem do repo [`auth`](https://github.com/fiap-vcosta/auth)) — sobe e desce com este stack
-- IPs globais + records Cloud DNS `api.<domínio>` (A), `auth.<domínio>` (CNAME) e apex (A) + domain mapping do Cloud Run auth
-- **API Gateway** + HTTPS LB no apex (`https://<domínio>/auth` e `/api`) com backends HTTPS nomeados
+- Bindings de Workload Identity: uma KSA por serviço, no namespace `tech-challenge`, sobre a service account de runtime do `infra-bootstrap`
+- IP global `tech-challenge-api`, record `api.<domínio>` e certificado managed SSL desse hostname
+- Gateway do GKE (`gke-l7-global-external-managed`) aplicado pelo workflow, mais o redirect HTTP → HTTPS
+- Record apex e **API Gateway** + HTTPS LB no apex. O OpenAPI repassa o path inteiro para `https://api.<domínio>`
 - State remoto em GCS (o bucket é do `infra-bootstrap` e não morre no destroy)
 
-Este stack entrega **cluster, identidade, auth, DNS da janela e API Gateway**. Os manifests da API (Deployment, Service, Ingress, HPA, ConfigMap, namespace e service account) vivem no repo [`api`](https://github.com/fiap-vcosta/api). A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
+Este stack entrega **cluster, identidade, DNS da janela, Gateway do GKE e API Gateway**. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço. A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
 
-Root module: [`terraform/`](terraform/).
+Root module: [`terraform/`](terraform/). O manifesto do Gateway é [`terraform/gke-gateway.yaml.tpl`](terraform/gke-gateway.yaml.tpl).
 
 ## Componentes (nuvem)
 
@@ -24,99 +24,101 @@ flowchart TB
   internet["Internet / Cliente"]
 
   subgraph bootstrap["infra-bootstrap persistente"]
-    dns["Cloud DNS zona vcosta-fiap.online"]
-    ar[("Artifact Registry")]
+    dns["Cloud DNS zona"]
     vpc["VPC + subnet + PSA"]
   end
 
   subgraph k8s["infra-k8s janela"]
     entryIp["HTTPS LB apex"]
     gw["API Gateway"]
-    authRun["Cloud Run auth GEN1 128Mi"]
     apiIp["IP tech-challenge-api"]
     nat["Cloud NAT"]
     subgraph gke["GKE Autopilot"]
-      ing["Ingress + ManagedCertificate"]
-      svc["Service ClusterIP"]
-      subgraph pod["Pod"]
-        api["API .NET"]
-        proxy["Cloud SQL Auth Proxy"]
-        dd["Datadog Agent"]
-      end
-      hpa["HPA"]
+      gkeGw["Gateway public"]
+      route["HTTPRoute do serviço"]
     end
   end
-
-  subgraph dbStack["infra-db janela"]
-    sql[("Cloud SQL PostgreSQL")]
-    sm[("Secret Manager senha")]
-  end
-
-  datadog["Datadog APM / logs"]
 
   internet --> dns
   dns -->|"A apex"| entryIp
   dns -->|"A api"| apiIp
-  dns -->|"CNAME auth"| authRun
   entryIp --> gw
-  gw -->|"/auth"| authRun
-  gw -->|"/api"| apiIp
-  apiIp --> ing
-  ing --> svc
-  svc --> api
-  hpa -.->|"escala"| api
-  api -->|"127.0.0.1:5432"| proxy
-  proxy -->|"IP privado + IAM"| sql
-  vpc -.-> sql
+  gw -->|"path inteiro"| apiIp
+  apiIp --> gkeGw
+  gkeGw --> route
   vpc -.-> gke
-  ar -.->|"imagem :latest"| api
-  ar -.->|"imagem :latest"| authRun
-  sm -.->|"senha no deploy"| api
-  authRun -->|"HTTPS X-Service-Key"| api
-  nat -->|"egress"| datadog
-  dd -->|"APM + logs"| datadog
+  nat -->|"egress"| internet
 ```
 
-Entrada oficial: `https://vcosta-fiap.online/auth` e `https://vcosta-fiap.online/api/...`. Sequência documento → JWT → aprovar: README do [`auth`](https://github.com/fiap-vcosta/auth). Modelo de dados: [`api/docs/08_modelo-de-dados.md`](https://github.com/fiap-vcosta/api/blob/main/docs/08_modelo-de-dados.md).
+Entrada oficial: `https://<domínio>/{serviço}/...`. O cliente não usa `api.<domínio>`; esse nome é o backend que o API Gateway chama.
 
-## Contrato com o repo `api`
+## Contrato com os serviços
 
-O binding em [`terraform/workload-identity.tf`](terraform/workload-identity.tf) autoriza uma service account Kubernetes específica a assumir a service account GCP de runtime:
+O binding em [`terraform/workload-identity.tf`](terraform/workload-identity.tf) autoriza cada service account Kubernetes a assumir a service account GCP de mesmo account id. O e-mail vem de `runtime_service_account_emails` no remote state do `infra-bootstrap`.
 
-| Valor | Onde vive aqui | Onde vive na `api` |
-|-------|----------------|--------------------|
-| Namespace `tech-challenge` | `var.k8s_namespace` | `metadata.namespace` dos manifests |
-| Service account `api` | `var.k8s_service_account` | `ServiceAccount` + `serviceAccountName` do pod |
-| E-mail da SA de runtime | remote state do bootstrap | anotação `iam.gke.io/gcp-service-account` |
+| Account id / nome da KSA | Namespace |
+|--------------------------|-----------|
+| `administrativo-service` | `tech-challenge` |
+| `autenticacao-service` | `tech-challenge` |
+| `estoque-service` | `tech-challenge` |
+| `orcamento-service` | `tech-challenge` |
+| `ordem-servico-service` | `tech-challenge` |
 
-Renomear namespace ou service account de um lado sem o outro **não** quebra `plan` nem `apply`: o binding continua válido apontando para uma identidade que não existe, e o sintoma aparece só em runtime, com o Cloud SQL Auth Proxy falhando na autenticação.
+A anotação `iam.gke.io/gcp-service-account` no manifesto do serviço usa o e-mail dessa chave. Renomear a KSA de um lado sem o outro não quebra `plan` nem `apply`: o binding aponta para uma identidade que não existe, e o sintoma aparece só em runtime.
 
 O binding mora aqui, e não no `infra-bootstrap`, porque o pool `PROJECT.svc.id.goog` só existe enquanto há cluster com Workload Identity no projeto: ele nasce e morre com a demo.
 
+### HTTPRoute
+
+Cada serviço publica o próprio `HTTPRoute` no namespace `tech-challenge`, preso ao listener `https` do Gateway `public`. O listener `http` só redireciona. Exemplo:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: administrativo
+  namespace: tech-challenge
+spec:
+  parentRefs:
+    - name: public
+      sectionName: https
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /administrativo
+      backendRefs:
+        - name: administrativo
+          port: 80
+```
+
+`/system` não entra nesse `HTTPRoute` nem no OpenAPI. O webhook `/orcamento/webhook/mercado-pago` é path público anônimo no API Gateway; a validação de `x-signature` fica no serviço.
+
 ## Entrada HTTP
 
-O desenho oficial é **HTTPS no apex** + **API Gateway** (`/auth` + `/api`) — ver [ADR 002](docs/adrs/002-api-gateway.md).
+O desenho é **HTTPS no apex** + **API Gateway** + **um Gateway do GKE** como único backend. Ver [ADR 004](docs/adrs/004-gke-gateway-api.md). A [ADR 002](docs/adrs/002-api-gateway.md) fica como registro do produto; a [ADR 003](docs/adrs/003-cloud-run-auth-gen1.md) foi substituída.
 
-O produto API Gateway só expõe `*.gateway.dev` nativamente. Para `https://vcosta-fiap.online/auth` e `/api`, este stack coloca um **HTTPS LB global** (Serverless NEG → Gateway) na frente, com cert gerenciado no apex.
+O produto API Gateway só expõe `*.gateway.dev` nativamente. Para `https://<domínio>/...`, este stack coloca um **HTTPS LB global** (Serverless NEG → API Gateway) na frente, com cert gerenciado no apex.
 
 Neste stack, a cada `tf-apply`:
 
-| Peça | Valor típico |
-|------|----------------|
-| IP `tech-challenge-api` | Ingress da API (`api.<domínio>`) — **backend** |
-| IP `tech-challenge-entry` | HTTPS LB da **entrada** (apex → Gateway) — output `gateway_entry_ip` |
-| `api.<domínio>` | A → IP da API (backend do Gateway) |
-| `auth.<domínio>` | CNAME → `ghs.googlehosted.com` + domain mapping |
-| Apex `<domínio>` | A → `gateway_entry_ip` (Cloud DNS, este stack) |
-| Entrada oficial | `https://<domínio>/auth` e `https://<domínio>/api/...` |
+| Peça | Valor |
+|------|--------|
+| IP `tech-challenge-api` | Gateway do GKE (`api.<domínio>`) — backend |
+| Certificado `tech-challenge-api-cert` | Managed SSL de `api.<domínio>`, anexado ao listener `https` |
+| IP `tech-challenge-entry` | HTTPS LB da entrada (apex → API Gateway) — output `gateway_entry_ip` |
+| `api.<domínio>` | A → IP do Gateway do GKE |
+| Apex `<domínio>` | A → `gateway_entry_ip` |
+| Gateway `public` | Classe `gke-l7-global-external-managed`, namespace `tech-challenge` |
+| Entrada oficial | `https://<domínio>/{serviço}/...` |
 
-Backends do Gateway: `https://auth.<domínio>` e `https://api.<domínio>`.
+Prefixos no OpenAPI: `/ordem-servico`, `/estoque`, `/orcamento`, `/administrativo`, `/autenticacao`, cada um no path exato e em `/{path=**}`, com GET, POST, PUT, PATCH e DELETE. `path_translation` é `APPEND_PATH_TO_ADDRESS`. Também entra `POST /orcamento/webhook/mercado-pago`. Tudo com `disable_auth: true`.
 
-O Ingress + ManagedCertificate de `api.…` ficam no repo `api`. A managed zone é do `infra-bootstrap`; os nameservers do domínio já apontam para o Google (`ns-cloud-c*`), então os records deste stack respondem na internet a cada `tf-apply`.
+O objeto Gateway não está no state. O `tf-apply` cria cluster, IP, DNS, certificado e API Gateway, e em seguida o `kubectl apply` grava o manifesto. O `plan` de PR não precisa do cluster no ar.
 
-Pré-requisito do Gateway: `https://api.…` com cert Active e auth HTTPS. Ordem: `tf-apply` (cluster + auth + records Cloud DNS `api`/`auth`/apex + Gateway/LB) → `deploy` API → esperar ManagedCertificate Active em `api.…` e o cert do apex Active.
+A managed zone é do `infra-bootstrap`. Os records deste stack respondem na internet a cada `tf-apply`. O certificado de `api.<domínio>` fica Active depois que o DNS aponta para o IP e o Gateway anexou o certificado. Até lá o API Gateway não completa a chamada HTTPS ao backend.
 
-**Custo:** na janela há **dois** IPs/LBs globais (API + entrada). Ambos saem no `tf-destroy`. Os records da janela (incluindo o apex) sobem e descem com este stack; no destroy o apex deixa de resolver até o próximo apply.
+**Custo:** na janela há **dois** LBs globais (entrada e Gateway do GKE). Ambos saem no `tf-destroy`. Os records da janela (incluindo o apex) sobem e descem com este stack; no destroy o apex deixa de resolver até o próximo apply.
 
 ## Acesso ao cluster
 
@@ -137,17 +139,9 @@ gcloud container clusters get-credentials tech-challenge-gke \
 
 Merge em `main` **nunca** liga o cluster.
 
-O `tf-destroy` apaga todo `Service type: LoadBalancer` e todo `Ingress` do cluster antes do `terraform destroy`: destruir o cluster com um deles de pé pode deixar forwarding rule / IP global órfão, cobrado por hora mesmo sem tráfego. A varredura é por tipo, não por nome, justamente porque os manifests não são deste repo.
+O `tf-destroy` apaga as `HTTPRoute` do namespace, o Gateway, todo `Service type: LoadBalancer` e todo `Ingress` antes do `terraform destroy`. Em seguida espera sumir a forwarding rule do IP `tech-challenge-api`. Se ela continuar, o workflow para e o cluster não é destruído. Destruir o cluster com essa rule de pé deixa cobrança por hora mesmo sem tráfego.
 
-Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_AR_REPOSITORY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`, `DOMAIN` (ex. `vcosta-fiap.online`). O Cloud Run auth recebe `API_BASE_URL=https://api.<DOMAIN>`. Secrets `JWT_CLIENTE_KEY` / `SERVICE_AUTH_KEY` (iguais aos da `api` / org). Os workflows falham cedo se o obrigatório vier vazio.
-
-## Auth (Cloud Run)
-
-Pré-requisito: pelo menos um **`build-push`** no repo `auth` (imagem `…/auth:latest` no Artifact Registry).
-
-No `tf-apply`, `API_BASE_URL` do auth sai de `DOMAIN` (`https://api.<DOMAIN>`). A imagem usada é sempre `…/auth:latest`. Outputs: `auth_service_uri`, `auth_image`, `auth_hostname`. Custo mínimo: GEN1 + 128Mi + `cpu_idle` — [ADR 003](docs/adrs/003-cloud-run-auth-gen1.md).
-
-O `tf-destroy` deste repo remove Cloud Run auth, domain mapping, records DNS, IPs globais, API Gateway e o HTTPS LB de entrada **junto** com o cluster.
+Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`. O hostname público sai da zona DNS do `infra-bootstrap`, não de uma org var deste workflow.
 
 ## Comandos
 
@@ -161,18 +155,17 @@ terraform validate
 ## Ordem na demo
 
 1. `infra-bootstrap` aplicado (zona Cloud DNS + NS Google no domínio, uma vez)
-2. Repo `auth` → merge/`build-push` (imagem no AR; pode ser antes da janela)
-3. `infra-db` → `tf-apply`
-4. Este repo → `tf-apply` (Autopilot + Cloud Run auth + records Cloud DNS `api`/`auth`/apex + Gateway/LB)
-5. `api` → Ingress/cert + `deploy`; esperar ManagedCertificate **Active** em `api.…`
-6. Esperar cert do apex Active → smoke `https://vcosta-fiap.online/auth` e `/api/...`
-7. Destroy inverso: este repo → `infra-db`
+2. `infra-db` → `tf-apply`, quando a janela for usar banco
+3. Este repo → `tf-apply` (Autopilot + records `api`/apex + certificado + API Gateway + Gateway do GKE)
+4. Esperar o certificado de `api.<domínio>` **Active** e o do apex **Active**
+5. `tf-apply` e `deploy` de cada serviço, que publicam o `HTTPRoute` no listener `https`
+6. Destroy inverso: serviços (e os `HTTPRoute`) → este repo → `infra-db`
 
-O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e não entra nesse ciclo.
+O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e não entra nesse ciclo. Um `tf-apply` deste repo sem serviço no ar sobe o encanamento: prefixo público chega ao Gateway e responde 404; `/system` não está no OpenAPI.
 
 ## Decisões (ADRs)
 
-Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy`, API Gateway e Cloud Run `auth` (GEN1 / 128Mi / `cpu_idle`).
+Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy`, API Gateway e Gateway do GKE.
 
 ## Repos da org
 
@@ -180,9 +173,15 @@ Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy`, API Gateway e Cl
 |------|--------|----------------------|
 | [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) | Rede, WIF, AR, zona DNS | Persistente |
 | [`infra-db`](https://github.com/fiap-vcosta/infra-db) | Cloud SQL | — |
-| [`infra-k8s`](https://github.com/fiap-vcosta/infra-k8s) | GKE + Gateway + Cloud Run auth | **Componentes (acima)** |
-| [`api`](https://github.com/fiap-vcosta/api) | App + manifests + Requestly | [ER / modelo de dados](https://github.com/fiap-vcosta/api/blob/main/docs/08_modelo-de-dados.md) |
-| [`auth`](https://github.com/fiap-vcosta/auth) | Imagem documento → JWT | Sequência no README |
+| [`infra-events`](https://github.com/fiap-vcosta/infra-events) | Tópicos Pub/Sub | — |
+| [`infra-k8s`](https://github.com/fiap-vcosta/infra-k8s) | GKE + Gateway do GKE + API Gateway | **Componentes (acima)** |
+| [`ordem-servico-service`](https://github.com/fiap-vcosta/ordem-servico-service) | Ordens de serviço | — |
+| [`estoque-service`](https://github.com/fiap-vcosta/estoque-service) | Estoque | — |
+| [`orcamento-service`](https://github.com/fiap-vcosta/orcamento-service) | Orçamento | — |
+| [`administrativo-service`](https://github.com/fiap-vcosta/administrativo-service) | Cadastros | — |
+| [`autenticacao-service`](https://github.com/fiap-vcosta/autenticacao-service) | Login e JWT | — |
+| [`building-blocks`](https://github.com/fiap-vcosta/building-blocks) | Pacote compartilhado | — |
+| [`e2e`](https://github.com/fiap-vcosta/e2e) | Compose, BDD e contratos | — |
 
 ## Agentes
 

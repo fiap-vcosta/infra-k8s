@@ -1,7 +1,7 @@
 # ADR 002: API Gateway como Entrada HTTP
 
 **Data:** 10 de Setembro de 2026  
-**Status:** Aceito  
+**Status:** Substituída em parte pela [ADR 004](004-gke-gateway-api.md)  
 **Autores:** Victor Costa
 
 ## 1. Contexto e Problema
