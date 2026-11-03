@@ -133,13 +133,13 @@ gcloud container clusters get-credentials tech-challenge-gke \
 
 | Tipo | Quando | Automático? |
 |------|--------|-------------|
-| **CI** `fmt` + `validate` | PR / push | Sim ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) |
+| **CI** `fmt` + `validate` (+ `plan` em PR) | PR / push | Sim ([`.github/workflows/ci.yml`](.github/workflows/ci.yml) → [`fiap-vcosta/actions`](https://github.com/fiap-vcosta/actions)) |
 | **CI** `plan` (OIDC) | PR | Sim |
 | **`tf-apply` / `tf-destroy`** | Janela da demo | Só manual (`workflow_dispatch`) |
 
 Merge em `main` **nunca** liga o cluster.
 
-O `tf-destroy` apaga as `HTTPRoute` do namespace, o Gateway, todo `Service type: LoadBalancer` e todo `Ingress` antes do `terraform destroy`. Em seguida espera sumir a forwarding rule do IP `tech-challenge-api`. Se ela continuar, o workflow para e o cluster não é destruído. Destruir o cluster com essa rule de pé deixa cobrança por hora mesmo sem tráfego.
+O `tf-destroy` apaga as `HTTPRoute` do namespace, o Gateway, todo `Service type: LoadBalancer` e todo `Ingress` no job local do caller, antes do `terraform destroy` reutilizável. Em seguida espera sumir a forwarding rule do IP `tech-challenge-api`. Se ela continuar, o workflow para e o cluster não é destruído. Destruir o cluster com essa rule de pé deixa cobrança por hora mesmo sem tráfego. O `tf-apply` aplica o Gateway do GKE no job local após o apply reutilizável.
 
 Org vars consumidas: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT_EMAIL`, `GCP_GKE_CLUSTER_NAME`. O hostname público sai da zona DNS do `infra-bootstrap`, não de uma org var deste workflow.
 
