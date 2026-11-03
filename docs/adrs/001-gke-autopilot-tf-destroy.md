@@ -1,7 +1,6 @@
 # ADR 001: GKE Autopilot e Ciclo `tf-destroy`
 
 **Data:** 10 de Setembro de 2026  
-**Atualizado:** 30 de Outubro de 2026  
 **Status:** Aceito  
 **Autores:** Victor Costa
 
@@ -16,14 +15,14 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 - **Cluster:** GKE **Autopilot** regional `tech-challenge-gke` em `us-central1`, VPC-native (rede do `infra-bootstrap`), nós privados.
 - **Egress:** **Cloud NAT** na subnet da demo (neste stack), para HTTPS externo dos nós privados (ex.: Datadog). Não mora no `infra-bootstrap` (custo por hora da janela).
 - **Control plane:** **DNS-only** (acesso por DNS + IAM; sem endpoint IP nem lista de IPs autorizados).
-- **Escopo deste repo:** cluster + NAT + bindings de Workload Identity + Gateway do GKE (manifesto no workflow) + API Gateway. O `HTTPRoute` de cada serviço fica no repositório do serviço.
-- **Ciclo de vida:** `tf-apply` / `tf-destroy` **manuais** (`workflow_dispatch`). `tf-destroy` apaga o state inteiro deste stack (sem carve-outs) e, **antes** do destroy, remove o Gateway, as `HTTPRoute`, Services `LoadBalancer` e Ingresses, e espera sumir a forwarding rule do IP do Gateway.
+- **Escopo deste repo:** cluster + NAT + binding de Workload Identity da KSA da API. **Manifests da aplicação ficam no repo `api`.**
+- **Ciclo de vida:** `tf-apply` / `tf-destroy` **manuais** (`workflow_dispatch`). `tf-destroy` apaga o state inteiro deste stack (sem carve-outs) e, **antes** do destroy, remove Services `LoadBalancer` do cluster para não deixar forwarding rule órfã cobrada.
 
 ## 3. Justificativa
 
 * **Autopilot** reduz operação de nós e cobra mais perto do uso dos pods — adequado a poucos minutos no ar + stress pontual de HPA.
 * **DNS-only** evita bastion e allowlist de IP para CI/máquina local; autenticação é IAM.
-* **Separação cluster × workload:** este repo não vira monorepo de YAML; cada serviço versiona o próprio `HTTPRoute` e o deploy.
+* **Separação cluster × workload:** este repo não vira monorepo de YAML; a `api` versiona manifests com o código e o deploy.
 * **Destroy sem carve-outs** mantém state = nuvem; recriar no próximo apply é aceitável. Apagar LBs antes evita cobrança residual conhecida do GKE.
 
 ## 4. Alternativas Consideradas
@@ -44,5 +43,5 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 ### Negativas / Riscos (Mitigações)
 * **Esquecer o destroy** deixa Autopilot sangrando.
   * *Mitigação:* processo demo-down obrigatório; destroy manual ao fim da janela.
-* **Contrato namespace/KSA com os serviços:** mismatch só aparece em runtime.
+* **Contrato namespace/`ServiceAccount` com a `api`:** mismatch só aparece em runtime.
   * *Mitigação:* valores documentados no README; binding e manifests devem usar os mesmos nomes.

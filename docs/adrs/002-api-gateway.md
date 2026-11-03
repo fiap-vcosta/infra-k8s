@@ -1,10 +1,8 @@
 # ADR 002: API Gateway como Entrada HTTP
 
 **Data:** 10 de Setembro de 2026  
-**Status:** Substituída em parte pela [ADR 004](004-gke-gateway-api.md). O produto API Gateway permanece. Paths, backends e o certificado do cluster passam a ser os da ADR 004.  
+**Status:** Substituída em parte pela [ADR 004](004-gke-gateway-api.md)  
 **Autores:** Victor Costa
-
-O texto abaixo registra a decisão original de setembro de 2026.
 
 ## 1. Contexto e Problema
 

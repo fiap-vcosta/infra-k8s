@@ -4,7 +4,7 @@
 **Status:** Aceito  
 **Autores:** Victor Costa
 
-Substitui a [ADR 003](003-cloud-run-auth-gen1.md). O produto API Gateway da [ADR 002](002-api-gateway.md) permanece; paths e backends passam a ser os desta ADR.
+Substitui a [ADR 003](003-cloud-run-auth-gen1.md). Substitui paths, backends e certificado do cluster da [ADR 002](002-api-gateway.md); o produto API Gateway permanece. Estende o ciclo `tf-destroy` da [ADR 001](001-gke-autopilot-tf-destroy.md) com a limpeza do Gateway e das `HTTPRoute` antes do destroy do cluster.
 
 ## 1. Contexto e Problema
 

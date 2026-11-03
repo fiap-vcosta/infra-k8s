@@ -4,8 +4,6 @@
 **Status:** Substituída pela [ADR 004](004-gke-gateway-api.md)  
 **Autores:** Victor Costa
 
-O texto abaixo registra a decisão original. O Cloud Run `auth` saiu do caminho oficial.
-
 ## 1. Contexto e Problema
 
 O serviço HTTP de autenticação de cliente (documento → JWT) sobe e desce com este stack, na mesma janela da demo do Autopilot. Cada segundo ligado custa; o tráfego é pontual (poucos requests no vídeo).
@@ -39,7 +37,7 @@ O problema a ser resolvido é: **Qual execution environment, memória e modelo d
 ### Positivas
 
 * Auth barato e alinhado ao destroy da demo.
-* ADR deixa explícito o que o Terraform aplicava em `terraform/auth.tf`, removido na ADR 004.
+* ADR deixa explícito o que o Terraform já aplica em [`terraform/auth.tf`](../../terraform/auth.tf).
 
 ### Negativas / Riscos (Mitigações)
 
