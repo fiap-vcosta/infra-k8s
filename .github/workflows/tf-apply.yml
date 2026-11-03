@@ -13,7 +13,14 @@ permissions:
 
 jobs:
   apply:
-    name: Terraform apply
+    uses: fiap-vcosta/actions/.github/workflows/tf-apply.yml@main
+    with:
+      concurrency_group: terraform-infra-k8s
+      require_k8s_vars: true
+
+  gateway:
+    name: Apply GKE Gateway
+    needs: apply
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -69,9 +76,6 @@ jobs:
 
       - name: Terraform init
         run: terraform init -input=false
-
-      - name: Terraform apply
-        run: terraform apply -input=false -auto-approve
 
       - name: Apply GKE Gateway
         env:
