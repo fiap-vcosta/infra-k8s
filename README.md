@@ -13,7 +13,7 @@ Terraform do **GKE Autopilot** que hospeda os serviços na GCP — Tech Challeng
 - Record apex e **API Gateway** + HTTPS LB no apex. O OpenAPI repassa o path inteiro para `https://api.<domínio>`
 - State remoto em GCS (o bucket é do `infra-bootstrap` e não morre no destroy)
 
-Este stack entrega **cluster, identidade, DNS da janela, Gateway do GKE e API Gateway**. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço. A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; o banco é do [`infra-db`](https://github.com/fiap-vcosta/infra-db). Kind / self-hosted não são caminho de entrega.
+Este stack entrega **cluster, identidade, DNS da janela, Gateway do GKE e API Gateway**. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço. A rede e a **managed zone** vêm do [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) via `terraform_remote_state`; cada serviço SQL cria a própria instância Cloud SQL. Kind / self-hosted não são caminho de entrega.
 
 Root module: [`terraform/`](terraform/). O manifesto do Gateway é [`terraform/gke-gateway.yaml.tpl`](terraform/gke-gateway.yaml.tpl).
 
@@ -155,11 +155,10 @@ terraform validate
 ## Ordem na demo
 
 1. `infra-bootstrap` aplicado (zona Cloud DNS + NS Google no domínio, uma vez)
-2. `infra-db` → `tf-apply`, quando a janela for usar banco
-3. Este repo → `tf-apply` (Autopilot + records `api`/apex + certificado + API Gateway + Gateway do GKE)
-4. Esperar o certificado de `api.<domínio>` **Active** e o do apex **Active**
-5. `tf-apply` e `deploy` de cada serviço, que publicam o `HTTPRoute` no listener `https`
-6. Destroy inverso: serviços (e os `HTTPRoute`) → este repo → `infra-db`
+2. Este repo → `tf-apply` (Autopilot + records `api`/apex + certificado + API Gateway + Gateway do GKE), em paralelo com `infra-events`
+3. Esperar o certificado de `api.<domínio>` **Active** e o do apex **Active**
+4. `tf-apply` de cada serviço (inclui 3 Cloud SQL) e `deploy`, que publicam o `HTTPRoute` no listener `https`
+5. Destroy inverso: serviços (Cloud SQL + `HTTPRoute`) → este repo → `infra-events`
 
 O `infra-bootstrap` (incluindo a zona DNS) é pré-requisito aplicado uma vez e não entra nesse ciclo. Um `tf-apply` deste repo sem serviço no ar sobe o encanamento: prefixo público chega ao Gateway e responde 404; `/system` não está no OpenAPI.
 
@@ -172,8 +171,8 @@ Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy`, API Gateway e Ga
 | Repo | Papel | Diagrama / doc-chave |
 |------|--------|----------------------|
 | [`infra-bootstrap`](https://github.com/fiap-vcosta/infra-bootstrap) | Rede, WIF, AR, zona DNS | Persistente |
-| [`infra-db`](https://github.com/fiap-vcosta/infra-db) | Cloud SQL | — |
 | [`infra-events`](https://github.com/fiap-vcosta/infra-events) | Tópicos Pub/Sub | — |
+| [`e2e`](https://github.com/fiap-vcosta/e2e) | Demo-up/down + ADR SQL 1:1 | [ADR](https://github.com/fiap-vcosta/e2e/blob/main/docs/adrs/001-instancia-cloud-sql-por-servico.md) |
 | [`infra-k8s`](https://github.com/fiap-vcosta/infra-k8s) | GKE + Gateway do GKE + API Gateway | **Componentes (acima)** |
 | [`ordem-servico-service`](https://github.com/fiap-vcosta/ordem-servico-service) | Ordens de serviço | — |
 | [`estoque-service`](https://github.com/fiap-vcosta/estoque-service) | Estoque | — |
@@ -181,7 +180,6 @@ Ver [`docs/README.md`](docs/README.md): Autopilot/`tf-destroy`, API Gateway e Ga
 | [`administrativo-service`](https://github.com/fiap-vcosta/administrativo-service) | Cadastros | — |
 | [`autenticacao-service`](https://github.com/fiap-vcosta/autenticacao-service) | Login e JWT | — |
 | [`building-blocks`](https://github.com/fiap-vcosta/building-blocks) | Pacote compartilhado | — |
-| [`e2e`](https://github.com/fiap-vcosta/e2e) | Compose, BDD e contratos | — |
 
 ## Agentes
 
