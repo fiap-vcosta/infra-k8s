@@ -1,6 +1,6 @@
 # Tech Challenge — Guia para agentes (`infra-k8s`)
 
-Terraform do **GKE Autopilot** que hospeda os serviços na GCP. Org [fiap-vcosta](https://github.com/fiap-vcosta). Rede e WIF em `infra-bootstrap`; banco em `infra-db`. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço.
+Terraform do **GKE Autopilot** que hospeda os serviços na GCP. Org [fiap-vcosta](https://github.com/fiap-vcosta). Rede e WIF em `infra-bootstrap`; Cloud SQL no Terraform de cada serviço SQL. O `HTTPRoute` e o deploy de cada serviço ficam no repositório do serviço.
 
 ## Antes de mudar código
 
