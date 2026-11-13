@@ -137,7 +137,7 @@ gcloud container clusters get-credentials tech-challenge-gke \
 | **CI** `plan` (OIDC) | PR | Sim |
 | **`tf-apply` / `tf-destroy`** | Janela da demo | Só manual (`workflow_dispatch`) |
 
-Merge em `main` **nunca** liga o cluster.
+Merge em `main` **nunca** liga o cluster. O gatilho de `tf-apply` / `tf-destroy` é **manual de propósito** (custo de Autopilot/LB); CI e `build-push` dos serviços seguem automáticos. Narrativa: [`e2e` ADR 006](https://github.com/fiap-vcosta/e2e/blob/main/docs/adrs/006-deploy-demo-manuais-custo.md).
 
 O `tf-destroy` apaga as `HTTPRoute` do namespace, o Gateway, todo `Service type: LoadBalancer` e todo `Ingress` no job local do caller, antes do `terraform destroy` reutilizável. Em seguida espera sumir a forwarding rule do IP `tech-challenge-api`. Se ela continuar, o workflow para e o cluster não é destruído. Destruir o cluster com essa rule de pé deixa cobrança por hora mesmo sem tráfego. O `tf-apply` aplica o Gateway do GKE no job local após o apply reutilizável.
 
