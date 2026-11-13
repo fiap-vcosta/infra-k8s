@@ -15,14 +15,14 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 - **Cluster:** GKE **Autopilot** regional `tech-challenge-gke` em `us-central1`, VPC-native (rede do `infra-bootstrap`), nós privados.
 - **Egress:** **Cloud NAT** na subnet da demo (neste stack), para HTTPS externo dos nós privados (ex.: Datadog). Não mora no `infra-bootstrap` (custo por hora da janela).
 - **Control plane:** **DNS-only** (acesso por DNS + IAM; sem endpoint IP nem lista de IPs autorizados).
-- **Escopo deste repo:** cluster + NAT + binding de Workload Identity da KSA da API. **Manifests da aplicação ficam no repo `api`.**
-- **Ciclo de vida:** `tf-apply` / `tf-destroy` **manuais** (`workflow_dispatch`). `tf-destroy` apaga o state inteiro deste stack (sem carve-outs) e, **antes** do destroy, remove Services `LoadBalancer` do cluster para não deixar forwarding rule órfã cobrada.
+- **Escopo deste repo:** cluster + NAT + bindings de Workload Identity das KSAs dos serviços + Gateway do GKE / API Gateway / DNS da janela. **Manifests de cada workload** (`Deployment`, `HTTPRoute`, …) ficam no repositório do serviço (ex. `ordem-servico-service`).
+- **Ciclo de vida:** `tf-apply` / `tf-destroy` **manuais** (`workflow_dispatch`). `tf-destroy` apaga o state inteiro deste stack (sem carve-outs) e, **antes** do destroy, remove Gateway/`HTTPRoute`/LBs órfãos do cluster para não deixar forwarding rule cobrada.
 
 ## 3. Justificativa
 
 * **Autopilot** reduz operação de nós e cobra mais perto do uso dos pods — adequado a poucos minutos no ar + stress pontual de HPA.
 * **DNS-only** evita bastion e allowlist de IP para CI/máquina local; autenticação é IAM.
-* **Separação cluster × workload:** este repo não vira monorepo de YAML; a `api` versiona manifests com o código e o deploy.
+* **Separação cluster × workload:** este repo não vira monorepo de YAML; cada serviço versiona manifests com o código e o deploy.
 * **Destroy sem carve-outs** mantém state = nuvem; recriar no próximo apply é aceitável. Apagar LBs antes evita cobrança residual conhecida do GKE.
 
 ## 4. Alternativas Consideradas
@@ -38,10 +38,10 @@ O problema a ser resolvido é: **Qual modo de GKE usamos, e como o destroy garan
 ### Positivas
 * Merge em `main` nunca liga o cluster.
 * Workload Identity do binding mora aqui (pool `svc.id.goog` só existe com cluster vivo).
-* Demo-down previsível: destroy k8s → destroy db.
+* Demo-down previsível: destroy dos serviços (Cloud SQL + subscriptions) → este repo → `infra-events` (orquestrado no `e2e`).
 
 ### Negativas / Riscos (Mitigações)
 * **Esquecer o destroy** deixa Autopilot sangrando.
-  * *Mitigação:* processo demo-down obrigatório; destroy manual ao fim da janela.
-* **Contrato namespace/`ServiceAccount` com a `api`:** mismatch só aparece em runtime.
+  * *Mitigação:* processo `demo-down` obrigatório; destroy manual ao fim da janela.
+* **Contrato namespace/`ServiceAccount` com os serviços:** mismatch só aparece em runtime.
   * *Mitigação:* valores documentados no README; binding e manifests devem usar os mesmos nomes.
